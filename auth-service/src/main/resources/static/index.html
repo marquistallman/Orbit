@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Auth Service Test</title>
+    <style>
+        body { font-family: sans-serif; }
+        .container { display: flex; gap: 20px; flex-wrap: wrap; }
+        .form-container { border: 1px solid #ccc; padding: 20px; border-radius: 5px; }
+        .result { margin-top: 10px; padding: 10px; border: 1px solid #eee; }
+        .social-login { margin-top: 20px; }
+    </style>
+</head>
+<body>
+
+<h1>Auth Service Test</h1>
+
+<div class="container">
+    <div class="form-container">
+        <h2>Register</h2>
+        <form id="registerForm">
+            <p><label>Email: <input type="email" id="registerEmail" required></label></p>
+            <p><label>Username: <input type="text" id="registerUsername" required></label></p>
+            <p><label>Password: <input type="password" id="registerPassword" required></label></p>
+            <p><button type="submit">Register</button></p>
+        </form>
+        <div id="registerResult" class="result"></div>
+    </div>
+
+    <div class="form-container">
+        <h2>Login</h2>
+        <form id="loginForm">
+            <p><label>Email: <input type="email" id="loginEmail" required></label></p>
+            <p><label>Password: <input type="password" id="loginPassword" required></label></p>
+            <p><button type="submit">Login</button></p>
+        </form>
+        <div id="loginResult" class="result"></div>
+    </div>
+
+    <div class="form-container social-login">
+        <h2>Social Login</h2>
+        <p><a href="/oauth2/authorization/google">Login with Google</a></p>
+        <p><a href="/oauth2/authorization/github">Login with GitHub</a></p>
+        <p><a href="/oauth2/authorization/facebook">Login with Facebook</a></p>
+        <p><a href="/oauth2/authorization/okta">Login with Okta</a></p>
+        <p><a href="/oauth2/authorization/linkedin">Login with LinkedIn</a></p>
+    </div>
+</div>
+
+<script>
+    document.getElementById('registerForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+        const email = document.getElementById('registerEmail').value;
+        const username = document.getElementById('registerUsername').value;
+        const password = document.getElementById('registerPassword').value;
+        const resultDiv = document.getElementById('registerResult');
+
+        fetch('/api/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, username, password })
+        })
+        .then(response => response.json())
+        .then(data => {
+            resultDiv.textContent = JSON.stringify(data, null, 2);
+        })
+        .catch(error => {
+            resultDiv.textContent = 'Error: ' + error;
+        });
+    });
+
+    document.getElementById('loginForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+        const email = document.getElementById('loginEmail').value;
+        const password = document.getElementById('loginPassword').value;
+        const resultDiv = document.getElementById('loginResult');
+
+        fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        })
+        .then(response => response.text())
+        .then(data => {
+            resultDiv.textContent = data;
+        })
+        .catch(error => {
+            resultDiv.textContent = 'Error: ' + error;
+        });
+    });
+</script>
+
+</body>
+</html>

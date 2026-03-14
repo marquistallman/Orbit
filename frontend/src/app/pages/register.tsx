@@ -5,6 +5,7 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Checkbox } from "../components/ui/checkbox";
+import { registerRequest } from "../../api/auth";
 
 export default function RegisterPage() {
   const navigate = useNavigate();
@@ -101,9 +102,18 @@ export default function RegisterPage() {
     }
 
     setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    setIsLoading(false);
-    navigate("/app");
+    
+    try {
+      const { token, user } = await registerRequest(formData.fullName, formData.email, formData.password);
+      // Guardamos el token y usuario para persistir la sesión
+      localStorage.setItem("token", token);
+      localStorage.setItem("user", JSON.stringify(user));
+      navigate("/app");
+    } catch (error: any) {
+      setErrors((prev) => ({ ...prev, terms: error.message || "Error al registrarse" }));
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const getInputState = (field: keyof typeof touched) => {

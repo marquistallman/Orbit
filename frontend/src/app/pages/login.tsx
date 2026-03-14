@@ -31,7 +31,7 @@ export default function LoginPage() {
 
   const validatePassword = (password: string) => {
     if (!password) return "Password is required";
-    if (password.length < 6) return "Password must be at least 6 characters";
+    if (password.length < 8) return "Password must be at least 8 characters";
     return "";
   };
 
@@ -63,6 +63,12 @@ export default function LoginPage() {
   const setAuth = useAuthStore((state) => state.setAuth);
   const [authError, setAuthError] = useState<string>("");
 
+  const getInputState = (field: "email" | "password") => {
+    if (!touched[field]) return "default";
+    if (errors[field]) return "error";
+    return "success";
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -82,8 +88,8 @@ export default function LoginPage() {
       const { user, token } = await loginRequest(formData.email, formData.password);
       setAuth(user, token);
       navigate("/app");
-    } catch (err) {
-      setAuthError("Credenciales inválidas. Intenta de nuevo.");
+    } catch (err: any) {
+      setAuthError(err.message || "Credenciales inválidas. Intenta de nuevo.");
     } finally {
       setIsLoading(false);
     }
