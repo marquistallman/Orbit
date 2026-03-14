@@ -10,3 +10,24 @@ services:
     volumes:
       - .:/app
     command: uvicorn main:app --reload --host 0.0.0.0 --port 8000
+    networks:
+      - orbit-network
+    depends_on:
+      - auth-service
+  # Microservicio de Autenticación (Java)
+  auth-service:
+    build: 
+      context: ./auth-service
+      dockerfile: Dockerfile
+    container_name: orbit-auth
+    ports:
+      - "8080:8080" # Mapea puerto 8080 del contenedor a tu máquina
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker # Útil si quieres config específica para docker
+    networks:
+      - orbit-network
+    restart: unless-stopped
+
+networks:
+  orbit-network:
+    driver: bridge
