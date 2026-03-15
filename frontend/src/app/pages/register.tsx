@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router-dom";
 import { User, Mail, Lock, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -109,8 +109,9 @@ export default function RegisterPage() {
       localStorage.setItem("token", token);
       localStorage.setItem("user", JSON.stringify(user));
       navigate("/app");
-    } catch (error: any) {
-      setErrors((prev) => ({ ...prev, terms: error.message || "Error al registrarse" }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Error al registrarse";
+      setErrors((prev) => ({ ...prev, terms: message }));
     } finally {
       setIsLoading(false);
     }

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router";
+import { Link } from "react-router-dom";
 import { Mail, ArrowLeft, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";

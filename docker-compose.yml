@@ -1,33 +1,49 @@
-version: '3.8'
-
 services:
-  ia-service:
-    build: .
-    ports:
-      - "8000:8000"
+  postgres:
+    image: postgres:16
+    container_name: orbit-postgres
     environment:
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
     volumes:
-      - .:/app
-    command: uvicorn main:app --reload --host 0.0.0.0 --port 8000
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - orbit-network
-    depends_on:
-      - auth-service
-  # Microservicio de Autenticación (Java)
   auth-service:
-    build: 
+    build:
       context: ./auth-service
       dockerfile: Dockerfile
-    container_name: orbit-auth
     ports:
-      - "8080:8080" # Mapea puerto 8080 del contenedor a tu máquina
-    environment:
-      - SPRING_PROFILES_ACTIVE=docker # Útil si quieres config específica para docker
+      - "8080:8080"
     networks:
       - orbit-network
-    restart: unless-stopped
-
+  ia-service:
+    build:
+      context: ./IA-service
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    networks:
+      - orbit-network
+    # Forzamos a FastAPI a escuchar en 0.0.0.0 para que sea accesible desde fuera
+    command: uvicorn main:app --host 0.0.0.0 --port 5000
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:80"
+    depends_on:
+      - auth-service
+      - ia-service
+    networks:
+      - orbit-network
+    # Variable de entorno común para que herramientas como Vite/React expongan el puerto
+    environment:
+      - HOST=0.0.0.0
 networks:
   orbit-network:
     driver: bridge
