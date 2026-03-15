@@ -1,19 +1,33 @@
 import os
 import requests
+from dotenv import load_dotenv
+from utils.logger import logger
 
-class ModelClient:
-    def __init__(self):
-        self.api_key = os.getenv('OPENROUTER_API_KEY')
-        self.base_url = "https://api.openai.com/v1/chat/completions"
+load_dotenv()
 
-    def send_request(self, task):
-        headers = {
-            "Authorization": f"Bearer {self.api_key}"
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+
+URL = "https://openrouter.ai/api/v1/chat/completions"
+
+
+def call_model(messages):
+
+    logger.info(f"Sending request to OpenRouter: {messages}")
+
+    response = requests.post(
+        URL,
+        headers={
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "Content-Type": "application/json"
+        },
+        json={
+            "model": "openai/gpt-4o-mini",
+            "messages": messages
         }
-        data = {
-            "model": "gpt-3.5-turbo",
-            "messages": [{"role": "user", "content": task}]
-        }
-        response = requests.post(self.base_url, headers=headers, json=data)
-        response.raise_for_status()
-        return response.json()
+    )
+
+    data = response.json()
+
+    logger.info(f"OpenRouter response: {data}")
+
+    return data["choices"][0]["message"]["content"]

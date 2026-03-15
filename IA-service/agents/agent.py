@@ -1,50 +1,109 @@
-from typing import Dict, Any
-from ai.model_client import ModelClient
+from ai.model_client import call_model
+from tools.tool_selector import select_tool
+from tools.tool_executor import execute_tool
+from agents.task_memory import create_task, finish_task
+from utils.logger import logger
 
-class Tool:
-    def __init__(self, name: str, description: str, function: callable):
-        self.name = name
-        self.description = description
-        self.function = function
 
-class ToolManager:
-    def __init__(self):
-        self.tools: Dict[str, Tool] = {}
+class Agent:
 
-    def add_tool(self, tool: Tool):
-        self.tools[tool.name] = tool
+    def run(self, task: str):
+        """
+        Main entry point of the agent.
+        Executes a task using the LLM and optional tools.
+        """
 
-    def get_tool(self, tool_id: str) -> Tool:
-        return self.tools.get(tool_id)
+        logger.info(f"Agent received task: {task}")
 
-    def list_tools(self) -> Dict[str, str]:
-        return {tool.name: tool.description for tool in self.tools.values()}
+        # Create task in memory
+        task_id = create_task(task)
 
-# Example tools
-def read_correos():
-    return "Read emails"
+        tool_used = None
+        tool_result = None
 
-def edit_documentos():
-    return "Edit documents"
+        try:
 
-def execute_code():
-    return "Execute code"
+            # -------------------------
+            # TOOL SELECTION
+            # -------------------------
 
-def simulate():
-    return "Simulate"
+            tool_used = select_tool(task)
 
-# Initialize tool manager
-tool_manager = ToolManager()
-tool_manager.add_tool(Tool("read_correos", "Read emails", read_correos))
-tool_manager.add_tool(Tool("edit_documentos", "Edit documents", edit_documentos))
-tool_manager.add_tool(Tool("execute_code", "Execute code", execute_code))
-tool_manager.add_tool(Tool("simulate", "Simulate", simulate))
+            logger.info(f"Tool selected: {tool_used}")
 
-# API endpoint to get tool ID
-from fastapi import FastAPI, HTTPException
+            # -------------------------
+            # TOOL EXECUTION
+            # -------------------------
 
-app = FastAPI()
+            if tool_used:
 
-@app.get("/agent/tools")
-async def get_agent_tools():
-    return tool_manager.list_tools()
+                logger.info(f"Executing tool: {tool_used}")
+
+                tool_result = execute_tool(tool_used, {"task": task})
+
+                logger.info(f"Tool result: {tool_result}")
+
+            # -------------------------
+            # PREPARE LLM MESSAGES
+            # -------------------------
+
+            messages = [
+                {
+                    "role": "system",
+                    "content": "You are an AI assistant capable of solving tasks."
+                }
+            ]
+
+            if tool_result:
+                messages.append({
+                    "role": "system",
+                    "content": f"Tool result: {tool_result}"
+                })
+
+            messages.append({
+                "role": "user",
+                "content": task
+            })
+
+            # -------------------------
+            # CALL LLM
+            # -------------------------
+
+            logger.info("Calling LLM")
+
+            response = call_model(messages)
+
+            logger.info(f"LLM response: {response}")
+
+            result = {
+                "task_id": task_id,
+                "task": task,
+                "tool_used": tool_used,
+                "tool_result": tool_result,
+                "response": response
+            }
+
+            # -------------------------
+            # FINISH TASK
+            # -------------------------
+
+            finish_task(task_id, result)
+
+            logger.info(f"Task completed: {task_id}")
+
+            return result
+
+        except Exception as e:
+
+            logger.error(f"Agent error: {str(e)}")
+
+            error_result = {
+                "task_id": task_id,
+                "task": task,
+                "status": "error",
+                "error": str(e)
+            }
+
+            finish_task(task_id, error_result)
+
+            return error_result
