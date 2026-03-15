@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router-dom";
 import { Mail, Lock, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -88,8 +88,8 @@ export default function LoginPage() {
       const { user, token } = await loginRequest(formData.email, formData.password);
       setAuth(user, token);
       navigate("/app");
-    } catch (err: any) {
-      setAuthError(err.message || "Credenciales inválidas. Intenta de nuevo.");
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : "Credenciales inválidas. Intenta de nuevo.");
     } finally {
       setIsLoading(false);
     }

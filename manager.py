@@ -66,7 +66,7 @@ def create_gui():
     tk.Label(frame, text="Access Services", font=("Helvetica", 11, "bold")).pack(pady=(15, 5))
 
     # Puertos estandar: Vite (5173), SpringBoot (8080), FastAPI (8000)
-    btn_open_front = tk.Button(frame, text="Open Frontend (Localhost)", command=lambda: open_url("http://localhost:3000"), width=25)
+    btn_open_front = tk.Button(frame, text="Open Frontend (Localhost)", command=lambda: open_url("http://localhost:5173"), width=25)
     btn_open_front.pack(pady=2)
 
     btn_open_auth = tk.Button(frame, text="Open Auth API", command=lambda: open_url("http://localhost:8080"), width=25)
