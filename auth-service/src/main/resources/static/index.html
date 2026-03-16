@@ -9,6 +9,8 @@
         .form-container { border: 1px solid #ccc; padding: 20px; border-radius: 5px; }
         .result { margin-top: 10px; padding: 10px; border: 1px solid #eee; }
         .social-login { margin-top: 20px; }
+        .connection-item { display: flex; justify-content: space-between; padding: 5px; border-bottom: 1px solid #eee; background: #fafafa; }
+        .btn-delete { background: #ff4444; color: white; border: none; padding: 2px 8px; cursor: pointer; border-radius: 3px; }
     </style>
 </head>
 <body>
@@ -37,6 +39,13 @@
         <div id="loginResult" class="result"></div>
     </div>
 
+    <div class="form-container">
+        <h2>My Connections</h2>
+        <p>Login first to see connections</p>
+        <button id="loadConnectionsBtn">Load Connections</button>
+        <div id="connectionsResult" class="result"></div>
+    </div>
+
     <div class="form-container social-login">
         <h2>Social Login</h2>
         <p><a href="/oauth2/authorization/google">Login with Google</a></p>
@@ -48,6 +57,8 @@
 </div>
 
 <script>
+    let authToken = null;
+
     document.getElementById('registerForm').addEventListener('submit', function (e) {
         e.preventDefault();
         const email = document.getElementById('registerEmail').value;
@@ -63,6 +74,7 @@
         .then(response => response.json())
         .then(data => {
             resultDiv.textContent = JSON.stringify(data, null, 2);
+            if (data.token) authToken = data.token;
         })
         .catch(error => {
             resultDiv.textContent = 'Error: ' + error;
@@ -80,14 +92,52 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, password })
         })
-        .then(response => response.text())
+        .then(response => response.json())
         .then(data => {
-            resultDiv.textContent = data;
+            resultDiv.textContent = JSON.stringify(data, null, 2);
+            if (data.token) authToken = data.token;
         })
         .catch(error => {
             resultDiv.textContent = 'Error: ' + error;
         });
     });
+
+    document.getElementById('loadConnectionsBtn').addEventListener('click', function() {
+        if (!authToken) {
+            alert("Please login or register first to get a token.");
+            return;
+        }
+        
+        fetch('/api/connections', {
+            headers: { 'Authorization': 'Bearer ' + authToken }
+        })
+        .then(response => response.json())
+        .then(data => {
+            const div = document.getElementById('connectionsResult');
+            div.innerHTML = '';
+            if (Array.isArray(data)) {
+                if (data.length === 0) div.textContent = "No linked accounts found.";
+                data.forEach(conn => {
+                    const item = document.createElement('div');
+                    item.className = 'connection-item';
+                    item.innerHTML = `<span><strong>${conn.providerName}</strong> (${conn.providerUserId})</span> 
+                                      <button class="btn-delete" onclick="deleteConnection('${conn.id}')">Unlink</button>`;
+                    div.appendChild(item);
+                });
+            } else {
+                div.textContent = JSON.stringify(data, null, 2);
+            }
+        })
+        .catch(err => document.getElementById('connectionsResult').textContent = 'Error: ' + err);
+    });
+
+    window.deleteConnection = function(id) {
+        if(!confirm("Unlink this account?")) return;
+        fetch('/api/connections/' + id, {
+            method: 'DELETE',
+            headers: { 'Authorization': 'Bearer ' + authToken }
+        }).then(() => document.getElementById('loadConnectionsBtn').click());
+    };
 </script>
 
 </body>

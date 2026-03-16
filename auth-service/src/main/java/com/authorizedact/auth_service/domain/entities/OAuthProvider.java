@@ -19,6 +19,18 @@ public class OAuthProvider {
     @Column(unique = true)
     private String name;
 
+    @Column(name = "client_id")
+    private String clientId;
+
+    @Column(name = "client_secret")
+    private String clientSecret;
+
+    @Column(name = "auth_url")
+    private String authUrl;
+
+    @Column(name = "token_url")
+    private String tokenUrl;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
