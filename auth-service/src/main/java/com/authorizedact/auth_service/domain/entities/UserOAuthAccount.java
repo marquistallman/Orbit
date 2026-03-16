@@ -16,16 +16,22 @@ public class UserOAuthAccount {
     @GeneratedValue(strategy = GenerationType.AUTO)
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne
     @JoinColumn(name = "provider_id", nullable = false)
     private OAuthProvider provider;
 
     @Column(name = "provider_user_id")
     private String providerUserId;
+
+    @Column(name = "access_token", columnDefinition = "TEXT")
+    private String accessToken;
+
+    @Column(name = "refresh_token", columnDefinition = "TEXT")
+    private String refreshToken;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

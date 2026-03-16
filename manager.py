@@ -23,16 +23,52 @@ def check_or_create_env_file():
             f.write(f"# JWT Secret Key\n")
             f.write(f"JWT_SECRET={jwt_secret}\n")
             f.write(f"\n# OAuth2 Credentials\n")
-            f.write(f"GOOGLE_CLIENT_ID=\n")
-            f.write(f"GOOGLE_CLIENT_SECRET=\n")
-            f.write(f"GITHUB_CLIENT_ID=\n")
-            f.write(f"GITHUB_CLIENT_SECRET=\n")
-            f.write(f"FACEBOOK_CLIENT_ID=\n")
-            f.write(f"FACEBOOK_CLIENT_SECRET=\n")
-            f.write(f"LINKEDIN_CLIENT_ID=\n")
-            f.write(f"LINKEDIN_CLIENT_SECRET=\n")
+            f.write(f"GOOGLE_CLIENT_ID=placeholder\n")
+            f.write(f"GOOGLE_CLIENT_SECRET=placeholder\n")
+            f.write(f"GITHUB_CLIENT_ID=placeholder\n")
+            f.write(f"GITHUB_CLIENT_SECRET=placeholder\n")
+            f.write(f"FACEBOOK_CLIENT_ID=placeholder\n")
+            f.write(f"FACEBOOK_CLIENT_SECRET=placeholder\n")
+            f.write(f"LINKEDIN_CLIENT_ID=placeholder\n")
+            f.write(f"LINKEDIN_CLIENT_SECRET=placeholder\n")
         
         messagebox.showinfo("Success", "A new '.env' file has been created. Please DO NOT commit this file to version control.")
+    else:
+        # Fix existing .env file if it has empty OAuth credentials
+        fix_empty_oauth_credentials()
+
+def fix_empty_oauth_credentials():
+    """Scans .env and replaces empty OAuth keys with 'placeholder' to prevent boot errors."""
+    oauth_keys = [
+        "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET",
+        "GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET",
+        "FACEBOOK_CLIENT_ID", "FACEBOOK_CLIENT_SECRET",
+        "LINKEDIN_CLIENT_ID", "LINKEDIN_CLIENT_SECRET"
+    ]
+    
+    try:
+        with open('.env', 'r') as f:
+            lines = f.readlines()
+        
+        modified = False
+        new_lines = []
+        for line in lines:
+            key_part = line.split('=')[0].strip()
+            val_part = line.split('=')[1].strip() if '=' in line else ''
+            
+            if key_part in oauth_keys and not val_part:
+                new_lines.append(f"{key_part}=placeholder\n")
+                modified = True
+            else:
+                new_lines.append(line)
+        
+        if modified:
+            with open('.env', 'w') as f:
+                f.writelines(new_lines)
+            print("Fixed empty OAuth credentials in .env file.")
+            
+    except Exception as e:
+        print(f"Warning: Could not check/fix .env file: {e}")
  
 def run_command(command):
     """Runs a command and shows the status in a message box."""
