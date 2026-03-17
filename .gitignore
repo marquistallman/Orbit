@@ -443,3 +443,8 @@ junit.xml
 
 # Miscellaneous
 HELP.md
+
+# Docker
+docker-compose.override.yml
+.env.docker
+.docker/

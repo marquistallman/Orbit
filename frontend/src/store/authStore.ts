@@ -1,12 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-
-export interface User {
-  id: string
-  name: string
-  email: string
-  bio?: string
-}
+import type { User } from '../api/auth'
 
 interface AuthState {
   user: User | null
@@ -23,9 +17,21 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       token: null,
       isAuthenticated: false,
-      setAuth: (user, token) => set({ user, token, isAuthenticated: true }),
-      updateUser: (data) => set(s => ({ user: s.user ? { ...s.user, ...data } : null })),
-      logout: () => set({ user: null, token: null, isAuthenticated: false }),
+
+      setAuth: (user, token) => {
+        localStorage.setItem('token', token)
+        set({ user, token, isAuthenticated: true })
+      },
+
+      updateUser: (data) =>
+        set((state) => ({
+          user: state.user ? { ...state.user, ...data } : null,
+        })),
+
+      logout: () => {
+        localStorage.removeItem('token')
+        set({ user: null, token: null, isAuthenticated: false })
+      },
     }),
     { name: 'orbit-auth' }
   )
