@@ -1,84 +1,53 @@
-const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
+import type { User } from '../store/authStore'
 
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  bio?: string;
-  avatar?: string;
-}
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
 export interface AuthResponse {
-  token: string;
-  user: User;
+  token: string
+  user: User
 }
 
-// ─── LOGIN ───────────────────────────────────────────
-export const loginRequest = async (
-  email: string,
-  password: string
-): Promise<AuthResponse> => {
+export const loginRequest = async (email: string, password: string): Promise<AuthResponse> => {
   // MOCK — reemplazar cuando el backend esté listo
-  await new Promise((r) => setTimeout(r, 1000));
-  if (email === "test@test.com" && password === "123456") {
-    return {
-      token: "mock-jwt-token-xyz",
-      user: { id: "1", name: "Luis Carlos", email },
-    };
+  await new Promise(r => setTimeout(r, 1200))
+  if (email === 'test@test.com' && password === '123456') {
+    return { token: 'mock-token-xyz', user: { id: '1', name: 'Luis Carlos', email } }
   }
-  throw new Error("Credenciales inválidas");
+  throw new Error('Credenciales inválidas')
 
-  // REAL — descomentar cuando el backend esté listo:
+  // REAL:
   // const res = await fetch(`${BASE_URL}/api/auth/login`, {
-  //   method: "POST",
-  //   headers: { "Content-Type": "application/json" },
+  //   method: 'POST',
+  //   headers: { 'Content-Type': 'application/json' },
   //   body: JSON.stringify({ email, password }),
-  // });
-  // if (!res.ok) throw new Error("Credenciales inválidas");
-  // return res.json();
-};
+  // })
+  // if (!res.ok) throw new Error('Credenciales inválidas')
+  // return res.json()
+}
 
-// ─── REGISTER ────────────────────────────────────────
-export const registerRequest = async (
-  name: string,
-  email: string,
-  password: string
-): Promise<AuthResponse> => {
-  // MOCK
-  await new Promise((r) => setTimeout(r, 1000));
-  return {
-    token: "mock-jwt-token-xyz",
-    user: { id: "2", name, email },
-  };
-
+export const registerRequest = async (name: string, email: string, password: string): Promise<AuthResponse> => {
+  await new Promise(r => setTimeout(r, 1200))
+  return { token: 'mock-token-xyz', user: { id: '2', name, email } }
   // REAL:
   // const res = await fetch(`${BASE_URL}/api/auth/register`, {
-  //   method: "POST",
-  //   headers: { "Content-Type": "application/json" },
+  //   method: 'POST',
+  //   headers: { 'Content-Type': 'application/json' },
   //   body: JSON.stringify({ name, email, password }),
-  // });
-  // if (!res.ok) throw new Error("Error al registrar");
-  // return res.json();
-};
+  // })
+  // if (!res.ok) throw new Error('Error al registrar')
+  // return res.json()
+}
 
-// ─── UPDATE PROFILE ───────────────────────────────────
-export const updateProfileRequest = async (
-  data: Partial<User>
-): Promise<User> => {
-  // MOCK
-  await new Promise((r) => setTimeout(r, 800));
-  return { id: "1", name: "Luis Carlos", email: "test@test.com", ...data };
-
+export const updateProfileRequest = async (data: Partial<User>): Promise<User> => {
+  await new Promise(r => setTimeout(r, 800))
+  return { id: '1', name: '', email: '', ...data }
   // REAL:
-  // const token = localStorage.getItem("token");
+  // const token = localStorage.getItem('orbit-auth')
   // const res = await fetch(`${BASE_URL}/api/auth/me`, {
-  //   method: "PUT",
-  //   headers: {
-  //     "Content-Type": "application/json",
-  //     Authorization: `Bearer ${token}`,
-  //   },
+  //   method: 'PUT',
+  //   headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
   //   body: JSON.stringify(data),
-  // });
-  // if (!res.ok) throw new Error("Error al actualizar perfil");
-  // return res.json();
-};
+  // })
+  // if (!res.ok) throw new Error('Error al actualizar')
+  // return res.json()
+}
