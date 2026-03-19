@@ -77,3 +77,16 @@ export const updateProfileRequest = async (
   // if (!res.ok) throw new Error("Error al actualizar perfil");
   // return res.json();
 };
+
+export const getMeRequest = async (): Promise<User> => {
+  const token = localStorage.getItem('token')
+  const res = await fetch(`${BASE_URL}/api/auth/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) throw new Error('Unauthorized')
+  return res.json()
+}
+
+export const logoutRequest = async (): Promise<void> => {
+  // Spring Boot es stateless con JWT — el logout es solo del lado del cliente
+}
