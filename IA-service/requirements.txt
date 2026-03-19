@@ -4,3 +4,4 @@ python-dotenv
 requests
 python-jose[cryptography]
 pydantic
+python-docx
