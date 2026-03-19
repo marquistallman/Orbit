@@ -1,8 +1,10 @@
 # Stage 1: Build the React application
 FROM node:22 AS builder
 WORKDIR /app
+
 # Copy package files
 COPY package.json package-lock.json ./
+
 # Install dependencies
 RUN npm ci
 # Fix rollup optional dependency bug
@@ -17,6 +19,5 @@ FROM nginx:stable-alpine
 RUN rm /etc/nginx/conf.d/default.conf
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/dist /usr/share/nginx/html
-
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
