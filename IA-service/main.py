@@ -9,10 +9,14 @@ from ai.model_client import ModelClient
 from agents.agent import tool_manager
 from ai.memory import Memory
 from jose import JWTError, jwt
+from prometheus_fastapi_instrumentator import Instrumentator
 
 load_dotenv()
 
 app = FastAPI()
+
+# Inicializar instrumentación de Prometheus
+Instrumentator().instrument(app).expose(app)
 
 # --- Configuración de Seguridad y CORS ---
 
