@@ -1,7 +1,6 @@
 package com.authorizedact.auth_service.features.connections;
 
 import com.authorizedact.auth_service.domain.entities.User;
-import com.authorizedact.auth_service.domain.entities.UserOAuthAccount;
 import com.authorizedact.auth_service.domain.repositories.UserOAuthAccountRepository;
 import com.authorizedact.auth_service.domain.repositories.UserRepository;
 import com.authorizedact.auth_service.features.connections.dtos.ConnectionDto;
