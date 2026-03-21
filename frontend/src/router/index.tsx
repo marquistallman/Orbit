@@ -5,6 +5,7 @@ import ProtectedRoute from '../components/layout/ProtectedRoute'
 import LoginPage from '../pages/auth/LoginPage'
 import RegisterPage from '../pages/auth/RegisterPage'
 import ForgotPasswordPage from '../pages/auth/ForgotPasswordPage'
+import OAuthCallbackPage from '../pages/auth/OAuthCallbackPage'
 
 // Lazy placeholders for app pages (to be built next)
 import { lazy, Suspense } from 'react'
@@ -35,6 +36,7 @@ export const router = createBrowserRouter([
       { index: true,           element: <LoginPage /> },
       { path: 'register',      element: <RegisterPage /> },
       { path: 'forgot-password', element: <ForgotPasswordPage /> },
+      { path: 'oauth/callback',  element: <OAuthCallbackPage /> },
     ],
   },
   {

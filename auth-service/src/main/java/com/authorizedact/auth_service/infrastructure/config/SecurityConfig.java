@@ -2,7 +2,7 @@ package com.authorizedact.auth_service.infrastructure.config;
 
 import com.authorizedact.auth_service.domain.repositories.UserRepository;
 import com.authorizedact.auth_service.infrastructure.security.JwtAuthenticationFilter;
-import com.authorizedact.auth_service.infrastructure.security.OAuth2LoginSuccessHandler;
+import com.authorizedact.auth_service.infrastructure.security.OAuth2AuthenticationSuccessHandler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationProvider;
@@ -30,11 +30,11 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final UserRepository userRepository;
-    private final OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler;
+    private final OAuth2AuthenticationSuccessHandler oAuth2AuthenticationSuccessHandler;
 
-    public SecurityConfig(UserRepository userRepository, OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler) {
+    public SecurityConfig(UserRepository userRepository, OAuth2AuthenticationSuccessHandler oAuth2AuthenticationSuccessHandler) {
         this.userRepository = userRepository;
-        this.oAuth2LoginSuccessHandler = oAuth2LoginSuccessHandler;
+        this.oAuth2AuthenticationSuccessHandler = oAuth2AuthenticationSuccessHandler;
     }
 
     @Bean
@@ -45,11 +45,19 @@ public class SecurityConfig {
             .formLogin(AbstractHttpConfigurer::disable)
             .httpBasic(AbstractHttpConfigurer::disable)
             .authorizeHttpRequests(authorize -> authorize
-                .requestMatchers("/", "/index.html", "/api/auth/**", "/oauth2/**", "/login/oauth2/code/*").permitAll()
-                .anyRequest().authenticated()
+                .requestMatchers(
+                    "/", 
+                    "/index.html", 
+                    "/api/auth/login", 
+                    "/api/auth/register", 
+                    "/api/auth/recover/**",
+                    "/oauth2/**", 
+                    "/login/oauth2/code/*"
+                ).permitAll()
+                .requestMatchers("/api/profile/me", "/api/auth/me").authenticated()
             )
             .oauth2Login(oauth2 -> oauth2
-                .successHandler(oAuth2LoginSuccessHandler)
+                .successHandler(oAuth2AuthenticationSuccessHandler)
             )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authenticationProvider(authenticationProvider())
@@ -81,7 +89,7 @@ public class SecurityConfig {
             com.authorizedact.auth_service.domain.entities.User user = userRepository.findByEmail(email)
                     .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
 
-            return new User(user.getEmail(), user.getPassword(), new ArrayList<>());
+            return new User(user.getEmail(), user.getPassword() == null ? "" : user.getPassword(), new ArrayList<>());
         };
     }
 

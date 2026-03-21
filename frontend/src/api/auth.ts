@@ -1,4 +1,4 @@
-const BASE_URL = import.meta.env.VITE_API_URL || "";
+const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
 export interface User {
   id: string;
@@ -83,7 +83,11 @@ export const getMeRequest = async (): Promise<User> => {
   const res = await fetch(`${BASE_URL}/api/auth/me`, {
     headers: { Authorization: `Bearer ${token}` },
   })
-  if (!res.ok) throw new Error('Unauthorized')
+  if (!res.ok) {
+    const errorBody = await res.text();
+    console.error("getMeRequest failed. Status:", res.status, "Body:", errorBody);
+    throw new Error(`Unauthorized: ${res.status} ${errorBody}`);
+  }
   return res.json()
 }
 

@@ -448,3 +448,4 @@ HELP.md
 docker-compose.override.yml
 .env.docker
 .docker/
+frontend/.env

@@ -12,6 +12,11 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<Map<String, String>> handleRuntimeException(RuntimeException ex) {
+        // Permitir que Spring Security maneje sus propias excepciones (AccessDenied, AuthException)
+        if (ex instanceof org.springframework.security.access.AccessDeniedException || 
+            ex instanceof org.springframework.security.core.AuthenticationException) {
+            throw ex;
+        }
         // Imprimimos el error en consola para depurar
         ex.printStackTrace();
         // Usamos 500 para errores de servidor o lógica inesperada, para no confundir con fallos de autenticación
