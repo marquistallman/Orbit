@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import AuthCard from '../../components/ui/AuthCard'
 import AuthInput from '../../components/ui/AuthInput'
 import AuthButton from '../../components/ui/AuthButton'
@@ -29,11 +29,26 @@ const FacebookIcon = () => (
 
 export default function LoginPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const setAuth = useAuthStore(s => s.setAuth)
   const [form, setForm] = useState({ email: '', password: '' })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
   const [authError, setAuthError] = useState('')
+
+  useEffect(() => {
+    // El flujo de éxito ahora lo maneja OAuthCallbackPage.
+    // Aquí solo escuchamos errores si el backend nos devuelve al login.
+    const errorParam = searchParams.get('error')
+    if (errorParam) {
+      const msg = decodeURIComponent(errorParam)
+      setAuthError(msg === 'oauth_failure' 
+        ? 'No pudimos iniciar sesión con tu cuenta social.' 
+        : msg
+      )
+      window.history.replaceState({}, document.title, window.location.pathname)
+    }
+  }, [searchParams])
 
   const validate = () => {
     const e: Record<string, string> = {}
