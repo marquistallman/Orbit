@@ -11,6 +11,7 @@ export default function OAuthCallbackPage() {
   const setAuth = useAuthStore(s => s.setAuth)
   const processedRef = useRef(false) // Evita doble ejecución en React StrictMode
   const [error, setError] = useState<string | null>(null)
+  const [successData, setSuccessData] = useState<{user: any, token: string} | null>(null)
 
   useEffect(() => {
     // Si ya procesamos el login, no hacemos nada (evita bucles)
@@ -39,11 +40,10 @@ export default function OAuthCallbackPage() {
           email: email || '' 
         }
         console.log("Auth success. Setting user:", user)
-        setAuth(user, token)
-        
-        setTimeout(() => {
-          navigate('/app', { replace: true })
-        }, 500)
+        // Guardamos en estado global y local
+        setAuth(user, token)     
+        // En lugar de redirigir, mostramos éxito
+        setSuccessData({ user, token })
       } else {
         console.error("Auth failed: No token found in URL")
         // Si falta algún dato, consideramos que el auth falló
@@ -52,6 +52,30 @@ export default function OAuthCallbackPage() {
     }
     authenticate()
   }, [searchParams, navigate, setAuth])
+
+  if (successData) {
+    return (
+      <AuthCard maxWidth={360}>
+        <div style={{ textAlign: 'center', padding: '24px 0' }}>
+          <OrbitIcon size={44} />
+          <h2 style={{ fontSize: 18, fontWeight: 600, color: '#4CAF50', margin: '16px 0 8px' }}>
+            Login Successful
+          </h2>
+          <p style={{ fontSize: 13, color: '#8C6A3E', marginBottom: 24 }}>
+            Welcome back, <span style={{color: '#C6A15B', fontWeight: 600}}>{successData.user.username}</span>
+          </p>
+          
+          <div style={{ padding: '0 20px' }}>
+             <AuthButton 
+                onClick={() => navigate('/app', { replace: true })}
+             >
+               Go to Dashboard
+             </AuthButton>
+          </div>
+        </div>
+      </AuthCard>
+    )
+  }
 
   if (error) {
     return (

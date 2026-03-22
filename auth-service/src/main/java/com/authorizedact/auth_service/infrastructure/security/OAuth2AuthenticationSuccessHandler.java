@@ -86,9 +86,9 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
             getRedirectStrategy().sendRedirect(request, response, targetUrl);
         } catch (Exception e) {
             e.printStackTrace();
-            // En caso de error, redirigir al login con parámetro de error
-            String errorUrl = UriComponentsBuilder.fromUriString(frontendUrl + "/login")
-                    .queryParam("error", "oauth_failure")
+            // Aseguramos que el error también vaya a la página de callback
+            String errorUrl = UriComponentsBuilder.fromUriString(frontendUrl + "/oauth-callback")
+                    .queryParam("error", "OAuth Error: " + e.getMessage())
                     .build().toUriString();
             getRedirectStrategy().sendRedirect(request, response, errorUrl);
         }
