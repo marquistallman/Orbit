@@ -13,6 +13,9 @@ export default function OAuthCallbackPage() {
   const [error, setError] = useState<string | null>(null)
   const [successData, setSuccessData] = useState<{user: any, token: string} | null>(null)
 
+  // Diagnóstico: Verificar si el componente llega a montarse
+  console.log("--- OAuthCallbackPage MOUNTED --- URL:", window.location.href);
+
   useEffect(() => {
     // Si ya procesamos el login, no hacemos nada (evita bucles)
     if (processedRef.current) return
