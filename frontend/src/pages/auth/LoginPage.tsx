@@ -110,23 +110,23 @@ export default function LoginPage() {
         )}
 
         <AuthButton type="submit" loading={loading}>Login</AuthButton>
-
-        <p style={{ textAlign: 'center', fontSize: 12, color: '#8C6A3E' }}>
-          Don't have an account?{' '}
-          <Link to="/register" style={{ color: '#C6A15B', textDecoration: 'none', fontWeight: 500 }}>
-            Create an account
-          </Link>
-        </p>
-
-        <OrDivider />
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <SocialButton icon={<GoogleIcon />}   label="Continue with Google"   onClick={() => window.location.href = 'http://localhost:8080/oauth2/authorization/google'} />
-          <SocialButton icon={<LinkedInIcon />} label="Continue with Linkedin" onClick={() => window.location.href = 'http://localhost:8080/oauth2/authorization/linkedin'} />
-          <SocialButton icon={<GithubIcon />}   label="Continue with Github"   onClick={() => window.location.href = 'http://localhost:8080/oauth2/authorization/github'} />
-          <SocialButton icon={<FacebookIcon />} label="Continue with Facebook" onClick={() => window.location.href = 'http://localhost:8080/oauth2/authorization/facebook'} />
-        </div>
       </form>
+
+      <p style={{ textAlign: 'center', fontSize: 12, color: '#8C6A3E', marginTop: 14 }}>
+        Don't have an account?{' '}
+        <Link to="/register" style={{ color: '#C6A15B', textDecoration: 'none', fontWeight: 500 }}>
+          Create an account
+        </Link>
+      </p>
+
+      <OrDivider />
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <SocialButton icon={<GoogleIcon />}   label="Continue with Google"   onClick={() => window.location.href = 'http://localhost:8080/oauth2/authorization/google'} />
+        <SocialButton icon={<LinkedInIcon />} label="Continue with Linkedin" onClick={() => window.location.href = 'http://localhost:8080/oauth2/authorization/linkedin'} />
+        <SocialButton icon={<GithubIcon />}   label="Continue with Github"   onClick={() => window.location.href = 'http://localhost:8080/oauth2/authorization/github'} />
+        <SocialButton icon={<FacebookIcon />} label="Continue with Facebook" onClick={() => window.location.href = 'http://localhost:8080/oauth2/authorization/facebook'} />
+      </div>
     </AuthCard>
   )
 }

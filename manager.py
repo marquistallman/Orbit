@@ -122,6 +122,11 @@ def start_service(service_name):
     command = f"docker-compose up -d --build {service_name}"
     run_command(command)
 
+def stop_service(service_name):
+    """Stops a specific service using docker-compose."""
+    command = f"docker-compose stop {service_name}"
+    run_command(command)
+
 def start_all_services():
     """Starts all services using docker-compose."""
     command = "docker-compose up -d --build"
@@ -239,14 +244,15 @@ def create_gui():
     config_button = tk.Button(frame, text="Configure Secrets (.env)", command=open_secrets_manager, width=25)
     config_button.pack(pady=5)
     
-    start_auth_button = tk.Button(frame, text="Start Auth Service", command=lambda: start_service("auth-service"), width=25)
-    start_auth_button.pack(pady=5)
-
-    start_ia_button = tk.Button(frame, text="Start IA Service", command=lambda: start_service("ia-service"), width=25)
-    start_ia_button.pack(pady=5)
-
-    start_frontend_button = tk.Button(frame, text="Start Frontend", command=lambda: start_service("frontend"), width=25)
-    start_frontend_button.pack(pady=5)
+    # --- Individual Service Controls ---
+    services = [("Auth Service", "auth-service"), ("IA Service", "ia-service"), ("Frontend", "frontend")]
+    
+    for label, service in services:
+        row_frame = tk.Frame(frame)
+        row_frame.pack(pady=2)
+        tk.Label(row_frame, text=label, width=12, anchor="e").pack(side=tk.LEFT, padx=5)
+        tk.Button(row_frame, text="Start", command=lambda s=service: start_service(s), width=8, bg="#E8F5E9").pack(side=tk.LEFT, padx=2)
+        tk.Button(row_frame, text="Stop", command=lambda s=service: stop_service(s), width=8, bg="#FFEBEE").pack(side=tk.LEFT, padx=2)
     
     # --- Access buttons ---
     tk.Label(frame, text="Access Services", font=("Helvetica", 11, "bold")).pack(pady=(15, 5))

@@ -54,6 +54,11 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
             if (userOptional.isPresent()) {
                 System.out.println("User found: " + email);
                 user = userOptional.get();
+                // FIX: Si el usuario existente no tiene username (de pruebas anteriores), lo asignamos
+                if (user.getUsername() == null || user.getUsername().isEmpty()) {
+                    user.setUsername(name != null ? name : email);
+                    user = userRepository.save(user);
+                }
             } else {
                 System.out.println("User not found, provisioning: " + email);
                 // Provisioning: Crear usuario automáticamente si no existe
@@ -70,13 +75,14 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
             System.out.println("JWT generated successfully for user ID: " + user.getId());
 
             // Redirigir al frontend con el token y datos de usuario en la URL
-            String targetUrl = UriComponentsBuilder.fromUriString(frontendUrl + "/oauth/callback")
+            String targetUrl = UriComponentsBuilder.fromUriString(frontendUrl + "/oauth-callback")
                     .queryParam("token", token)
                     .queryParam("userId", user.getId())
                     .queryParam("username", user.getUsername())
                     .queryParam("email", user.getEmail())
                     .build().toUriString();
 
+            System.out.println("Redirecting to frontend: " + targetUrl);
             getRedirectStrategy().sendRedirect(request, response, targetUrl);
         } catch (Exception e) {
             e.printStackTrace();
