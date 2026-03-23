@@ -1,4 +1,5 @@
 const _IA_URL = import.meta.env.VITE_IA_URL || 'http://localhost:5000'
+const _GMAIL_URL = import.meta.env.VITE_GMAIL_URL || 'http://localhost:8082'
 
 export interface Message {
   id: string
@@ -11,6 +12,7 @@ export interface Message {
   source: 'gmail' | 'slack' | string
   read: boolean
   urgent: boolean
+  actions?: ('accept' | 'reject')[]
 }
 
 // MOCK data
@@ -28,6 +30,7 @@ const MOCK_MESSAGES: Message[] = [
     preview: 'Can you confirm attendance for the Thursday meeting?',
     body: `Hola,\n\nQuería confirmar si puedes asistir a la reunión del jueves a las 10am. Será en la sala principal.\n\nSaludos,\nAna`,
     date: 'Hoy, 11:45', source: 'gmail', read: false, urgent: false,
+    actions: ['accept', 'reject'],
   },
   {
     id: '3', from: 'Equipo Dev', email: 'dev@empresa.com',
@@ -59,20 +62,48 @@ const MOCK_MESSAGES: Message[] = [
   },
 ]
 
-// GET messages — calls IA-service gmail_read tool
+// Helper to map Gmail Service response to Message interface
+const mapGmailToMessage = (e: any): Message => ({
+  id: e.id || e.gmail_id,
+  from: e.sender ? e.sender.split('<')[0].trim() : 'Unknown',
+  email: e.sender && e.sender.includes('<') ? e.sender.match(/<(.+)>/)?.[1] || '' : e.sender,
+  subject: e.subject || '(No Subject)',
+  preview: e.snippet || '',
+  body: e.body_html || e.snippet || '',
+  date: e.received_at ? new Date(e.received_at).toLocaleDateString() : 'Unknown',
+  source: 'gmail',
+  read: true,
+  urgent: false
+})
+
+// GET messages — robust flow: IA -> Gmail -> Mock
 export const getMessages = async (): Promise<Message[]> => {
-  // REAL — uncomment when IA-service is running:
+  // 1. Try IA Service (Agent)
   try {
     const res = await fetch(`${_IA_URL}/agent/action`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tool: 'gmail_read', payload: {} }),
     })
+    if (!res.ok) throw new Error('IA Service unavailable')
     const data = await res.json()
     return data.result?.messages || []
-  } catch { return MOCK_MESSAGES }
-
-  
+  } catch (err) {
+    // 2. Fallback to Gmail Service
+    try {
+      const token = localStorage.getItem('token')
+      const userId = localStorage.getItem('userId')
+      const res = await fetch(`${_GMAIL_URL}/emails?userId=${userId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      if (!res.ok) throw new Error('Gmail Service unavailable')
+      const emails = await res.json()
+      return emails.map(mapGmailToMessage)
+    } catch (finalError) {
+      console.error('Failed to fetch messages from both IA and Gmail services:', finalError)
+      throw finalError
+    }
+  }
 }
 
 // AI summary of a message

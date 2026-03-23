@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 import requests
-from ai.model_client import ModelClient
+from ai.model_client import call_model
 from agents.agent import tool_manager
 from ai.memory import Memory
 from jose import JWTError, jwt
@@ -73,9 +73,8 @@ async def run_agent(agent_request: AgentRequest, current_user: dict = Depends(ge
         return memory_result
 
     # Simulate calling the LLM (OpenRouter)
-    model_client = ModelClient()
-    response = model_client.send_request(task)
-    result = response["choices"][0]["message"]["content"]
+    messages = [{"role": "user", "content": task}]
+    result = call_model(messages)
 
     # Save to memory
     memory.save_memory(task, result)
