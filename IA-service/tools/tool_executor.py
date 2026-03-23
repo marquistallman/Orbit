@@ -12,11 +12,16 @@ def execute_tool(tool_id, payload):
         return {"error": "Tool not found"}
 
     endpoint = tool["endpoint"]
+    method = tool.get("method", "POST") # Default to POST
 
     logger.info(f"Calling tool {tool_id} at {endpoint} with {payload}")
 
     try:
-        response = requests.post(endpoint, json=payload)
+        if method.upper() == "GET":
+            response = requests.get(endpoint, params=payload)
+        else:
+            response = requests.post(endpoint, json=payload)
+        
         result = response.json()
 
         logger.info(f"Tool response: {result}")

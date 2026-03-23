@@ -1,4 +1,4 @@
-const _IA_URL = import.meta.env.VITE_IA_URL || 'http://localhost:8001'
+const _IA_URL = import.meta.env.VITE_IA_URL || 'http://localhost:5000'
 
 export interface Message {
   id: string
@@ -62,18 +62,17 @@ const MOCK_MESSAGES: Message[] = [
 // GET messages — calls IA-service gmail_read tool
 export const getMessages = async (): Promise<Message[]> => {
   // REAL — uncomment when IA-service is running:
-  // try {
-  //   const res = await fetch(`${IA_URL}/agent/action`, {
-  //     method: 'POST',
-  //     headers: { 'Content-Type': 'application/json' },
-  //     body: JSON.stringify({ tool: 'gmail_read', payload: {} }),
-  //   })
-  //   const data = await res.json()
-  //   return data.result?.messages || []
-  // } catch { return MOCK_MESSAGES }
+  try {
+    const res = await fetch(`${_IA_URL}/agent/action`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tool: 'gmail_read', payload: {} }),
+    })
+    const data = await res.json()
+    return data.result?.messages || []
+  } catch { return MOCK_MESSAGES }
 
-  await new Promise(r => setTimeout(r, 400))
-  return MOCK_MESSAGES
+  
 }
 
 // AI summary of a message

@@ -245,7 +245,7 @@ def create_gui():
     config_button.pack(pady=5)
     
     # --- Individual Service Controls ---
-    services = [("Auth Service", "auth-service"), ("IA Service", "ia-service"), ("Frontend", "frontend")]
+    services = [("Auth Service", "auth-service"), ("IA Service", "ia-service"), ("Gmail Service", "gmail-service"), ("Frontend", "frontend")]
     
     for label, service in services:
         row_frame = tk.Frame(frame)
@@ -266,6 +266,9 @@ def create_gui():
 
     btn_open_ia = tk.Button(frame, text="Open IA Docs", command=lambda: open_url("http://localhost:5000/docs"), width=25)
     btn_open_ia.pack(pady=2)
+
+    btn_open_gmail = tk.Button(frame, text="Open Gmail API", command=lambda: open_url("http://localhost:8082"), width=25)
+    btn_open_gmail.pack(pady=2)
 
     # --- Stop button ---
     stop_button = tk.Button(frame, text="Stop All Services", command=stop_all_services, bg="red", fg="white", width=25)
