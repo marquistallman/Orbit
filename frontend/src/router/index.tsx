@@ -36,7 +36,7 @@ export const router = createBrowserRouter([
       { index: true,           element: <LoginPage /> },
       { path: 'register',      element: <RegisterPage /> },
       { path: 'forgot-password', element: <ForgotPasswordPage /> },
-      { path: 'oauth/callback',  element: <OAuthCallbackPage /> },
+      { path: 'oauth-callback',  element: <OAuthCallbackPage /> },
     ],
   },
   {

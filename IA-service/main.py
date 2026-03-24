@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 import requests
-from ai.model_client import ModelClient
+from ai.model_client import call_model
 from agents.agent import tool_manager
 from ai.memory import Memory
 from jose import JWTError, jwt
@@ -58,6 +58,10 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
 class AgentRequest(BaseModel):
     task: str
 
+class ActionRequest(BaseModel):
+    tool: str
+    payload: dict = {}
+
 memory = Memory("memory.db")
 
 @app.post("/agent/run")
@@ -73,14 +77,18 @@ async def run_agent(agent_request: AgentRequest, current_user: dict = Depends(ge
         return memory_result
 
     # Simulate calling the LLM (OpenRouter)
-    model_client = ModelClient()
-    response = model_client.send_request(task)
-    result = response["choices"][0]["message"]["content"]
+    messages = [{"role": "user", "content": task}]
+    result = call_model(messages)
 
     # Save to memory
     memory.save_memory(task, result)
 
     return {"result": result}
+
+@app.post("/agent/action")
+async def agent_action(request: ActionRequest):
+    # Endpoint compatible con la llamada del frontend (tools) para evitar fallos de conexión
+    return {"result": {"messages": []}}
 
 @app.get("/")
 def health_check():

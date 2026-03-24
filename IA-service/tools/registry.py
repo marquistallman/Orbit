@@ -1,7 +1,8 @@
 TOOLS = {
     "gmail_read": {
         "description": "Read user emails",
-        "endpoint": "http://localhost:9001/read"
+        "endpoint": "http://gmail-service:8082/emails",
+        "method": "GET"
     },
     "document_edit": {
         "description": "Edit documents",
