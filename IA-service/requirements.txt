@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+python-dotenv
+requests
+python-jose[cryptography]
+pydantic
+python-docx
+pytest
+httpx
