@@ -70,6 +70,8 @@ El servidor estará disponible en http://localhost:8000
 
 ## Tests
 
+### Tests Automatizados
+
 Ejecuta los tests automatizados (cobertura de API y contratos):
 
 ```
@@ -81,6 +83,97 @@ Los tests validan:
 - ✅ Códigos HTTP correctos (200, 404, 422)
 - ✅ Estructura de respuestas (response models)
 - ✅ Manejo de errores
+
+Resultado esperado: **12/12 tests PASSING** ✅
+
+### Pruebas Manuales (Testing Manual)
+
+#### Opción 1: UI Interactiva (Recomendado 👍)
+
+1. Inicia el servicio:
+   ```
+   docker-compose up --build
+   ```
+
+2. Abre en tu navegador: **http://localhost:8000/docs**
+
+3. Verás Swagger UI donde puedes probar todos los endpoints interactivamente.
+
+#### Opción 2: Curl desde PowerShell
+
+**Prueba 1 - Email/Gmail:**
+```powershell
+$body = @{
+    task = "write a professional email to my boss about Q1 results"
+} | ConvertTo-Json
+
+Invoke-RestMethod -Uri "http://localhost:8000/agent/run" `
+  -Method Post `
+  -Headers @{"Content-Type"="application/json"} `
+  -Body $body
+```
+
+**Prueba 2 - Análisis Financiero:**
+```powershell
+$body = @{
+    task = "analyze my investment portfolio performance for tech stocks in the last quarter and give recommendations"
+} | ConvertTo-Json
+
+Invoke-RestMethod -Uri "http://localhost:8000/agent/run" `
+  -Method Post `
+  -Headers @{"Content-Type"="application/json"} `
+  -Body $body
+```
+
+**Prueba 3 - Genérica (Cualquier cosa):**
+```powershell
+$body = @{
+    task = "create a comprehensive python project structure for a web scraper with best practices"
+} | ConvertTo-Json
+
+Invoke-RestMethod -Uri "http://localhost:8000/agent/run" `
+  -Method Post `
+  -Headers @{"Content-Type"="application/json"} `
+  -Body $body
+```
+
+**Response esperado (200):**
+```json
+{
+  "task_id": "uuid-unique-id",
+  "task": "...",
+  "status": null,
+  "tool_used": null,
+  "tool_result": null,
+  "response": "...",
+  "error": null,
+  "created_at": null
+}
+```
+
+#### Opción 3: Herramientas GUI
+
+Usa **Postman** o **Insomnia** (apps de desktop):
+- **URL:** `POST http://localhost:8000/agent/run`
+- **Headers:** `Content-Type: application/json`
+- **Body (JSON):**
+  ```json
+  {
+    "task": "write a gmail about vacation plans"
+  }
+  ```
+
+### Casos de Uso de Prueba
+
+El agente se adapta automáticamente según palabras clave en la tarea:
+
+| Palabra clave | Ejemplo de tarea | Herramienta seleccionada |
+|---------------|------------------|------------------------|
+| email, gmail, write | "write an email about..." | `email_generate` |
+| finance, investment, portfolio, stock | "analyze my stocks..." | `finance_analysis` |
+| document, edit, file | "create a document..." | `document_edit` |
+| code, script, program | "write a python script..." | `code_run` |
+| (ninguna) | "general question or task" | Consulta solo el LLM |
 
 ## Documentación de la API
 
