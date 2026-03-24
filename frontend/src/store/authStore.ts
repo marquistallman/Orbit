@@ -20,6 +20,7 @@ export const useAuthStore = create<AuthState>()(
 
       setAuth: (user, token) => {
         localStorage.setItem('token', token)
+        localStorage.setItem('userId', user.id) // Guardar ID de usuario
         set({ user, token, isAuthenticated: true })
       },
 

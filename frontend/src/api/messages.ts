@@ -73,7 +73,8 @@ const mapGmailToMessage = (e: any): Message => ({
   date: e.received_at ? new Date(e.received_at).toLocaleDateString() : 'Unknown',
   source: 'gmail',
   read: true,
-  urgent: false
+  urgent: false,
+  actions: (e.subject || '').toLowerCase().includes('meeting') ? ['accept', 'reject'] : undefined
 })
 
 // GET messages — robust flow: IA -> Gmail -> Mock
@@ -97,8 +98,20 @@ export const getMessages = async (): Promise<Message[]> => {
         headers: { 'Authorization': `Bearer ${token}` }
       })
       if (!res.ok) throw new Error('Gmail Service unavailable')
-      const emails = await res.json()
-      return emails.map(mapGmailToMessage)
+      let emails = await res.json()
+
+      // 2.1. Auto-sync: Si no hay correos (primera vez), forzamos sincronización
+      if (!emails || emails.length === 0) {
+        console.log('Bandeja vacía. Sincronizando con Gmail...')
+        try {
+          await fetch(`${_GMAIL_URL}/emails/sync?userId=${userId}`, { headers: { 'Authorization': `Bearer ${token}` } })
+          // Reintentamos leer después del sync
+          const retry = await fetch(`${_GMAIL_URL}/emails?userId=${userId}`, { headers: { 'Authorization': `Bearer ${token}` } })
+          if (retry.ok) emails = await retry.json()
+        } catch (syncErr) { console.warn('Auto-sync failed:', syncErr) }
+      }
+
+      return (emails || []).map(mapGmailToMessage)
     } catch (finalError) {
       console.error('Failed to fetch messages from both IA and Gmail services:', finalError)
       throw finalError

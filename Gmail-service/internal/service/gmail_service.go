@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"log"
 	"time"
 
 	"gmail-service/internal/config"
@@ -31,21 +32,28 @@ func (s *GmailService) GetEmails(ctx context.Context, userID string) ([]domain.E
 
 // SyncEmails lee de Gmail y guarda en DB usando el repositorio
 func (s *GmailService) SyncEmails(ctx context.Context, userID string) (int, error) {
+	log.Printf("Iniciando SyncEmails para userID: %s", userID)
 	client, err := s.getGmailClient(ctx, userID)
 	if err != nil {
+		log.Printf("Error al obtener gmail client: %v", err)
 		return 0, err
 	}
+	log.Println("Gmail client obtenido exitosamente")
 
 	user := "me"
 	listRes, err := client.Users.Messages.List(user).MaxResults(10).Do()
 	if err != nil {
+		log.Printf("Error al listar mensajes de gmail: %v", err)
 		return 0, err
 	}
+	log.Printf("Se encontraron %d mensajes", len(listRes.Messages))
 
 	count := 0
 	for _, msg := range listRes.Messages {
+		log.Printf("Procesando mensaje con ID: %s", msg.Id)
 		fullMsg, err := client.Users.Messages.Get(user, msg.Id).Format("full").Do()
 		if err != nil {
+			log.Printf("Error al obtener mensaje completo: %v", err)
 			continue
 		}
 
@@ -61,8 +69,11 @@ func (s *GmailService) SyncEmails(ctx context.Context, userID string) (int, erro
 
 		if err := s.repo.SaveEmail(email); err == nil {
 			count++
+		} else {
+			log.Printf("Error al guardar email en la DB: %v", err)
 		}
 	}
+	log.Printf("Se guardaron %d emails nuevos", count)
 	return count, nil
 }
 
@@ -98,7 +109,6 @@ func (s *GmailService) getGmailClient(ctx context.Context, userID string) (*gmai
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 		TokenType:    "Bearer",
-		Expiry:       time.Now().Add(-1 * time.Hour),
 	}
 
 	tokenSource := conf.TokenSource(ctx, token)

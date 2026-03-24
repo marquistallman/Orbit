@@ -9,6 +9,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
@@ -23,13 +26,15 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
 
     private final JwtService jwtService;
     private final UserRepository userRepository;
+    private final OAuth2AuthorizedClientService authorizedClientService;
 
     @Value("${app.frontend-url}")
     private String frontendUrl;
 
-    public OAuth2AuthenticationSuccessHandler(JwtService jwtService, UserRepository userRepository) {
+    public OAuth2AuthenticationSuccessHandler(JwtService jwtService, UserRepository userRepository, OAuth2AuthorizedClientService authorizedClientService) {
         this.jwtService = jwtService;
         this.userRepository = userRepository;
+        this.authorizedClientService = authorizedClientService;
     }
 
     @Override
@@ -57,7 +62,6 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
                 // FIX: Si el usuario existente no tiene username (de pruebas anteriores), lo asignamos
                 if (user.getUsername() == null || user.getUsername().isEmpty()) {
                     user.setUsername(name != null ? name : email);
-                    user = userRepository.save(user);
                 }
             } else {
                 System.out.println("User not found, provisioning: " + email);
@@ -67,8 +71,24 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
                 // Usamos el nombre de Google o el email como username
                 user.setUsername(name != null ? name : email);
                 user.setPassword(""); // Password vacío para usuarios sociales
-                user = userRepository.save(user);
             }
+
+            // --- CAPTURAR TOKENS DE GOOGLE PARA EL GMAIL-SERVICE ---
+            if (authentication instanceof OAuth2AuthenticationToken oauthToken) {
+                OAuth2AuthorizedClient client = authorizedClientService.loadAuthorizedClient(
+                        oauthToken.getAuthorizedClientRegistrationId(),
+                        oauthToken.getName());
+                
+                if (client != null && client.getAccessToken() != null) {
+                    System.out.println("Saving Google Access Token for user: " + email);
+                    user.setAccessToken(client.getAccessToken().getTokenValue());
+                    if (client.getRefreshToken() != null) {
+                        user.setRefreshToken(client.getRefreshToken().getTokenValue());
+                    }
+                }
+            }
+            // Guardamos el usuario con los tokens actualizados
+            user = userRepository.save(user);
 
             // Generar Token JWT
             String token = jwtService.generateToken(user);

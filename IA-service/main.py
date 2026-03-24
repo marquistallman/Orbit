@@ -58,6 +58,10 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
 class AgentRequest(BaseModel):
     task: str
 
+class ActionRequest(BaseModel):
+    tool: str
+    payload: dict = {}
+
 memory = Memory("memory.db")
 
 @app.post("/agent/run")
@@ -80,6 +84,11 @@ async def run_agent(agent_request: AgentRequest, current_user: dict = Depends(ge
     memory.save_memory(task, result)
 
     return {"result": result}
+
+@app.post("/agent/action")
+async def agent_action(request: ActionRequest):
+    # Endpoint compatible con la llamada del frontend (tools) para evitar fallos de conexión
+    return {"result": {"messages": []}}
 
 @app.get("/")
 def health_check():

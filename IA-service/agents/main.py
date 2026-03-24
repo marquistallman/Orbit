@@ -14,6 +14,10 @@ app = FastAPI()
 class AgentRequest(BaseModel):
     task: str
 
+class ActionRequest(BaseModel):
+    tool: str
+    payload: dict = {}
+
 memory = Memory("memory.db")
 
 @app.post("/agent/run")
@@ -38,6 +42,11 @@ async def run_agent(request: Request):
     memory.save_memory(task, result)
 
     return {"result": result}
+
+@app.post("/agent/action")
+async def agent_action(request: ActionRequest):
+    # Endpoint compatible con la llamada del frontend (tools)
+    return {"result": {"messages": []}}
 
 @app.get("/agent/status/{task_id}")
 async def get_agent_status(task_id: str):
