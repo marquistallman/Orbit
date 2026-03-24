@@ -4,6 +4,7 @@ package com.authorizedact.auth_service.infrastructure.security;
 
 import com.authorizedact.auth_service.domain.entities.User;
 import com.authorizedact.auth_service.domain.repositories.UserRepository;
+import com.authorizedact.auth_service.features.oauth.OAuthDataSynchronizer;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -27,14 +28,16 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
     private final JwtService jwtService;
     private final UserRepository userRepository;
     private final OAuth2AuthorizedClientService authorizedClientService;
+    private final OAuthDataSynchronizer oAuthDataSynchronizer;
 
     @Value("${app.frontend-url}")
     private String frontendUrl;
 
-    public OAuth2AuthenticationSuccessHandler(JwtService jwtService, UserRepository userRepository, OAuth2AuthorizedClientService authorizedClientService) {
+    public OAuth2AuthenticationSuccessHandler(JwtService jwtService, UserRepository userRepository, OAuth2AuthorizedClientService authorizedClientService, OAuthDataSynchronizer oAuthDataSynchronizer) {
         this.jwtService = jwtService;
         this.userRepository = userRepository;
         this.authorizedClientService = authorizedClientService;
+        this.oAuthDataSynchronizer = oAuthDataSynchronizer;
     }
 
     @Override
@@ -74,21 +77,42 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
             }
 
             // --- CAPTURAR TOKENS DE GOOGLE PARA EL GMAIL-SERVICE ---
+            String accessToken = null;
+            String refreshToken = null;
+            String providerName = "unknown";
+
             if (authentication instanceof OAuth2AuthenticationToken oauthToken) {
+                providerName = oauthToken.getAuthorizedClientRegistrationId();
                 OAuth2AuthorizedClient client = authorizedClientService.loadAuthorizedClient(
-                        oauthToken.getAuthorizedClientRegistrationId(),
+                        providerName,
                         oauthToken.getName());
                 
                 if (client != null && client.getAccessToken() != null) {
                     System.out.println("Saving Google Access Token for user: " + email);
-                    user.setAccessToken(client.getAccessToken().getTokenValue());
+                    accessToken = client.getAccessToken().getTokenValue();
+                    // user.setAccessToken(...) -> Mantenemos esto si lo usas en el User entity temporalmente, 
+                    // pero la data real se irá al Synchronizer.
+                    user.setAccessToken(accessToken);
+                    
                     if (client.getRefreshToken() != null) {
-                        user.setRefreshToken(client.getRefreshToken().getTokenValue());
+                        refreshToken = client.getRefreshToken().getTokenValue();
+                        user.setRefreshToken(refreshToken);
                     }
                 }
             }
             // Guardamos el usuario con los tokens actualizados
             user = userRepository.save(user);
+
+            // --- NUEVO PASO: Sincronizar datos con tablas relacionales (oauth_providers, user_oauth_accounts) ---
+            // Esto asegura que init.sql se respete y los datos estén disponibles para otros servicios.
+            oAuthDataSynchronizer.syncOAuthData(
+                    user, 
+                    providerName, 
+                    oAuth2User.getName(), // ID del usuario en Google
+                    accessToken, 
+                    refreshToken
+            );
+            // ----------------------------------------------------------------------------------------------------
 
             // Generar Token JWT
             String token = jwtService.generateToken(user);

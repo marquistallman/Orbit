@@ -46,7 +46,8 @@ func (r *PostgresEmailRepository) GetEmailsByUserID(userID string) ([]domain.Ema
 }
 
 func (r *PostgresEmailRepository) GetOAuthTokens(userID string) (string, string, error) {
-	var accessToken, refreshToken string
+	var accessToken string
+	var refreshToken sql.NullString // Usar sql.NullString para manejar valores NULL de la DB
 	// Ajustar consulta según tu esquema real de user_oauth_accounts
 	query := `SELECT access_token, refresh_token FROM user_oauth_accounts WHERE user_id = $1 LIMIT 1`
 
@@ -54,7 +55,8 @@ func (r *PostgresEmailRepository) GetOAuthTokens(userID string) (string, string,
 	if err != nil {
 		return "", "", fmt.Errorf("error obteniendo tokens: %w", err)
 	}
-	return accessToken, refreshToken, nil
+	// Devuelve el string del token o un string vacío si es NULL, sin causar un crash.
+	return accessToken, refreshToken.String, nil
 }
 
 func (r *PostgresEmailRepository) SaveEmail(e domain.Email) error {
