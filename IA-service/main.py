@@ -1,3 +1,7 @@
+import logging
+# Configuración básica para asegurar que los logs salgan a stdout inmediatamente
+logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routes.agent_routes import router as agent_router
@@ -25,3 +29,8 @@ app.include_router(agent_router)
 @app.get("/")
 def health_check():
     return {"status": "IA-service is running"}
+
+# Endpoint para evitar 404 de Prometheus
+@app.get("/metrics")
+def metrics():
+    return {"status": "ok"}

@@ -9,7 +9,7 @@ from utils.logger import logger
 HTTP_TIMEOUT_SECONDS = float(os.getenv("HTTP_TIMEOUT_SECONDS", "20"))
 
 
-def execute_tool(tool_id, payload):
+def execute_tool(tool_id, payload, headers=None):
 
     if payload is None:
         payload = {}
@@ -38,7 +38,13 @@ def execute_tool(tool_id, payload):
     logger.info(f"Calling tool {tool_id} at {endpoint} with payload {payload}")
 
     try:
-        response = requests.post(endpoint, json=payload, timeout=HTTP_TIMEOUT_SECONDS)
+        if method.upper() == "GET":
+            # Para GET, enviamos el payload como query parameters
+            response = requests.get(endpoint, params=payload, headers=headers, timeout=HTTP_TIMEOUT_SECONDS)
+        else:
+            # Para POST/others, enviamos como JSON
+            response = requests.request(method, endpoint, json=payload, headers=headers, timeout=HTTP_TIMEOUT_SECONDS)
+            
         response.raise_for_status()
 
         try:

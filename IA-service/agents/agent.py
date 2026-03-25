@@ -7,7 +7,7 @@ from utils.logger import logger
 
 class Agent:
 
-    def run(self, task: str):
+    def run(self, task: str, token: str = None):
 
         logger.info(f"Agent received task: {task}")
 
@@ -30,7 +30,14 @@ class Agent:
             if tool_used:
                 logger.info(f"Executing tool: {tool_used}")
 
-                tool_result = execute_tool(tool_used, {"task": task})
+                # Propagamos headers si tenemos un token
+                headers = {"Authorization": token} if token else {}
+                
+                # Si es lectura de gmail, el microservicio espera userId en los params
+                # Por ahora lo pasamos vacío para que el microservicio use el token para identificarlo
+                payload = {"task": task}
+                
+                tool_result = execute_tool(tool_used, payload, headers=headers)
 
                 logger.info(f"Tool result: {tool_result}")
 
@@ -98,7 +105,8 @@ class Agent:
                     "content": response
                 }
 
-                doc_result = execute_tool("document_edit", doc_payload)
+                headers = {"Authorization": token} if token else {}
+                doc_result = execute_tool("document_edit", doc_payload, headers=headers)
 
                 tool_result = doc_result
 

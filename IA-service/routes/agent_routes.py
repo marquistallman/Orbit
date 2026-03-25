@@ -1,14 +1,14 @@
 from typing import Any
 from datetime import datetime
 from enum import Enum
-
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from agents.agent import Agent
 from agents.task_memory import get_task, get_history
 from tools.registry import get_tools
 from tools.tool_executor import execute_tool
+from utils.logger import logger
 
 router = APIRouter()
 
@@ -80,8 +80,9 @@ class TaskHistoryResponse(BaseModel):
 # -------------------------
 
 @router.post("/agent/run", response_model=AgentRunResponse)
-def run_agent(data: AgentRunRequest):
-    return agent.run(data.task)
+def run_agent(data: AgentRunRequest, request: Request):
+    token = request.headers.get("Authorization")
+    return agent.run(data.task, token=token)
 
 
 # -------------------------
@@ -98,8 +99,17 @@ def list_tools():
 # -------------------------
 
 @router.post("/agent/action", response_model=ActionResponse)
-def run_action(data: AgentActionRequest):
-    result = execute_tool(data.tool, data.payload)
+def run_action(data: AgentActionRequest, request: Request):
+    logger.info(f"--- Action Request: {data.tool} ---")
+    token = request.headers.get("Authorization")
+    
+    result = execute_tool(data.tool, data.payload, headers={"Authorization": token} if token else None)
+    
+    if isinstance(result, dict) and "error" in result:
+        logger.error(f"Tool execution failed: {result['error']}")
+        raise HTTPException(status_code=502, detail=result["error"])
+    else:
+        logger.info(f"Tool {data.tool} executed successfully")
 
     return {
         "tool": data.tool,
@@ -108,8 +118,9 @@ def run_action(data: AgentActionRequest):
 
 
 @router.post("/agent/tool", response_model=ToolResponse)
-def run_tool(data: AgentToolRequest):
-    result = execute_tool(data.tool_id, data.payload)
+def run_tool(data: AgentToolRequest, request: Request):
+    token = request.headers.get("Authorization")
+    result = execute_tool(data.tool_id, data.payload, headers={"Authorization": token} if token else None)
     return {"result": result}
 
 

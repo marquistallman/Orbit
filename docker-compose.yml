@@ -1,4 +1,4 @@
-<<<<<<<< HEAD:docker-compose.yml
+
 services:
   postgres:
     image: postgres:16
@@ -34,6 +34,8 @@ services:
     # Load environment variables from the .env file
     env_file:
       - ./.env
+    environment:
+      - PYTHONUNBUFFERED=1
     networks:
       - orbit-network
     # Forzamos a FastAPI a escuchar en 0.0.0.0 para que sea accesible desde fuera
@@ -92,17 +94,3 @@ services:
 networks:
   orbit-network:
     driver: bridge
-========
-services:
-  ia-service:
-    build: .
-    ports:
-      - "8000:8000"
-    environment:
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-      - OPENROUTER_MODEL=${OPENROUTER_MODEL:-openai/gpt-4o-mini}
-      - HTTP_TIMEOUT_SECONDS=${HTTP_TIMEOUT_SECONDS:-20}
-    volumes:
-      - .:/app
-    command: uvicorn main:app --reload --host 0.0.0.0 --port 8000
->>>>>>>> origin/Dani:IA-service/docker-compose.yml
