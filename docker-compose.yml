@@ -1,3 +1,4 @@
+
 services:
   postgres:
     image: postgres:16
@@ -33,6 +34,8 @@ services:
     # Load environment variables from the .env file
     env_file:
       - ./.env
+    environment:
+      - PYTHONUNBUFFERED=1
     networks:
       - orbit-network
     # Forzamos a FastAPI a escuchar en 0.0.0.0 para que sea accesible desde fuera
