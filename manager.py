@@ -37,6 +37,37 @@ def check_or_create_env_file():
         # Fix existing .env file if it has empty OAuth credentials
         fix_empty_oauth_credentials()
 
+def check_or_create_frontend_env():
+    """Checks for frontend/.env and creates it if not found, and adds it to .gitignore."""
+    frontend_dir = "frontend"
+    env_path = os.path.join(frontend_dir, ".env")
+    
+    if os.path.exists(frontend_dir):
+        if not os.path.exists(env_path):
+            with open(env_path, "w") as f:
+                f.write("VITE_API_URL=http://localhost:8080\n")
+                f.write("VITE_IA_URL=http://localhost:5000\n")
+            print(f"Created {env_path} with default values.")
+        
+        # Ensure ignored in root .gitignore
+        add_to_gitignore("frontend/.env")
+    else:
+        print("Warning: frontend directory not found.")
+
+def add_to_gitignore(entry):
+    """Adds a pattern to .gitignore if it doesn't exist."""
+    gitignore_path = ".gitignore"
+    if os.path.exists(gitignore_path):
+        with open(gitignore_path, "r") as f:
+            content = f.read()
+        if entry not in content:
+            with open(gitignore_path, "a") as f:
+                f.write(f"\n{entry}\n")
+            print(f"Added {entry} to .gitignore")
+    else:
+        with open(gitignore_path, "w") as f:
+            f.write(f"{entry}\n")
+
 def fix_empty_oauth_credentials():
     """Scans .env and replaces empty OAuth keys with 'placeholder' to prevent boot errors."""
     oauth_keys = [
@@ -91,6 +122,11 @@ def start_service(service_name):
     command = f"docker-compose up -d --build {service_name}"
     run_command(command)
 
+def stop_service(service_name):
+    """Stops a specific service using docker-compose."""
+    command = f"docker-compose stop {service_name}"
+    run_command(command)
+
 def start_all_services():
     """Starts all services using docker-compose."""
     command = "docker-compose up -d --build"
@@ -109,55 +145,76 @@ def open_secrets_manager():
     """Opens a window to update secrets in .env without revealing existing values."""
     editor = tk.Toplevel()
     editor.title("Manage Environment Secrets")
-    editor.geometry("500x400")
+    editor.geometry("600x650")
 
     tk.Label(editor, text="Update Secrets (Leave empty to keep current value)", font=("Helvetica", 10, "bold")).pack(pady=10)
     
-    fields = [
-        ("Google Client ID", "GOOGLE_CLIENT_ID"),
-        ("Google Secret", "GOOGLE_CLIENT_SECRET"),
-        ("GitHub Client ID", "GITHUB_CLIENT_ID"),
-        ("GitHub Secret", "GITHUB_CLIENT_SECRET"),
-        ("Facebook Client ID", "FACEBOOK_CLIENT_ID"),
-        ("Facebook Secret", "FACEBOOK_CLIENT_SECRET"),
-        ("LinkedIn Client ID", "LINKEDIN_CLIENT_ID"),
-        ("LinkedIn Secret", "LINKEDIN_CLIENT_SECRET"),
-        ("JWT Secret", "JWT_SECRET")
+    # Define sections: (Title, Fields [(Label, Key, ShowChar)], FilePath)
+    sections = [
+        ("Backend / Root .env", [
+            ("Google Client ID", "GOOGLE_CLIENT_ID", "*"),
+            ("Google Secret", "GOOGLE_CLIENT_SECRET", "*"),
+            ("GitHub Client ID", "GITHUB_CLIENT_ID", "*"),
+            ("GitHub Secret", "GITHUB_CLIENT_SECRET", "*"),
+            ("Facebook Client ID", "FACEBOOK_CLIENT_ID", "*"),
+            ("Facebook Secret", "FACEBOOK_CLIENT_SECRET", "*"),
+            ("LinkedIn Client ID", "LINKEDIN_CLIENT_ID", "*"),
+            ("LinkedIn Secret", "LINKEDIN_CLIENT_SECRET", "*"),
+            ("JWT Secret", "JWT_SECRET", "*")
+        ], ".env"),
+        ("Frontend / frontend/.env", [
+            ("VITE API URL (Auth)", "VITE_API_URL", ""),
+            ("VITE IA URL (Agent)", "VITE_IA_URL", "")
+        ], os.path.join("frontend", ".env"))
     ]
     
-    entries = {}
+    entries_map = {} # Maps key -> (EntryWidget, FilePath)
     form_frame = tk.Frame(editor)
-    form_frame.pack(padx=10, pady=5)
+    form_frame.pack(padx=10, pady=5, fill="both", expand=True)
     
-    for idx, (label, key) in enumerate(fields):
-        tk.Label(form_frame, text=label).grid(row=idx, column=0, sticky="e", padx=5, pady=2)
-        # show="*" hides the input
-        entry = tk.Entry(form_frame, width=35, show="*") 
-        entry.grid(row=idx, column=1, padx=5, pady=2)
-        entries[key] = entry
+    current_row = 0
+    for section_title, fields, file_path in sections:
+        tk.Label(form_frame, text=section_title, font=("Helvetica", 9, "bold", "underline"), fg="#C6A15B").grid(row=current_row, column=0, columnspan=2, pady=(15, 5), sticky="w")
+        current_row += 1
         
-    def save_changes():
-        if not os.path.exists('.env'):
-            messagebox.showerror("Error", ".env file not found!")
-            return
-            
-        # Read existing file
-        with open('.env', 'r') as f:
+        for label, key, show_char in fields:
+            tk.Label(form_frame, text=label).grid(row=current_row, column=0, sticky="e", padx=5, pady=2)
+            entry = tk.Entry(form_frame, width=45, show=show_char) 
+            entry.grid(row=current_row, column=1, padx=5, pady=2)
+            entries_map[key] = (entry, file_path)
+            current_row += 1
+
+    def update_file(filename, updates):
+        if not os.path.exists(filename): return
+        
+        with open(filename, 'r') as f:
             lines = f.readlines()
-            
-        new_lines = []
-        updates = {k: v.get() for k, v in entries.items() if v.get()}
         
+        new_lines = []
         for line in lines:
-            key = line.split('=')[0].strip()
-            if key in updates:
-                new_lines.append(f"{key}={updates[key]}\n")
-                del updates[key] # Mark as processed
-            else:
-                new_lines.append(line)
-                
-        with open('.env', 'w') as f:
+            parts = line.split('=', 1)
+            if parts:
+                key = parts[0].strip()
+                if key in updates:
+                    new_lines.append(f"{key}={updates[key]}\n")
+                    del updates[key] # Mark as processed
+                    continue
+            new_lines.append(line)
+            
+        with open(filename, 'w') as f:
             f.writelines(new_lines)
+
+    def save_changes():
+        # Group updates by file
+        updates_by_file = {}
+        for key, (entry, file_path) in entries_map.items():
+            val =QH = entry.get().strip()
+            if val:
+                if file_path not in updates_by_file: updates_by_file[file_path] = {}
+                updates_by_file[file_path][key] = val
+        
+        for fpath, updates in updates_by_file.items():
+            update_file(fpath, updates)
             
         messagebox.showinfo("Success", "Secrets updated successfully.")
         editor.destroy()
@@ -171,6 +228,7 @@ def create_gui():
 
     # Ensure .env file exists before doing anything else
     check_or_create_env_file()
+    check_or_create_frontend_env()
 
     frame = tk.Frame(root, padx=10, pady=10)
     frame.pack(padx=10, pady=10)
@@ -186,14 +244,15 @@ def create_gui():
     config_button = tk.Button(frame, text="Configure Secrets (.env)", command=open_secrets_manager, width=25)
     config_button.pack(pady=5)
     
-    start_auth_button = tk.Button(frame, text="Start Auth Service", command=lambda: start_service("auth-service"), width=25)
-    start_auth_button.pack(pady=5)
-
-    start_ia_button = tk.Button(frame, text="Start IA Service", command=lambda: start_service("ia-service"), width=25)
-    start_ia_button.pack(pady=5)
-
-    start_frontend_button = tk.Button(frame, text="Start Frontend", command=lambda: start_service("frontend"), width=25)
-    start_frontend_button.pack(pady=5)
+    # --- Individual Service Controls ---
+    services = [("Auth Service", "auth-service"), ("IA Service", "ia-service"), ("Gmail Service", "gmail-service"), ("Frontend", "frontend")]
+    
+    for label, service in services:
+        row_frame = tk.Frame(frame)
+        row_frame.pack(pady=2)
+        tk.Label(row_frame, text=label, width=12, anchor="e").pack(side=tk.LEFT, padx=5)
+        tk.Button(row_frame, text="Start", command=lambda s=service: start_service(s), width=8, bg="#E8F5E9").pack(side=tk.LEFT, padx=2)
+        tk.Button(row_frame, text="Stop", command=lambda s=service: stop_service(s), width=8, bg="#FFEBEE").pack(side=tk.LEFT, padx=2)
     
     # --- Access buttons ---
     tk.Label(frame, text="Access Services", font=("Helvetica", 11, "bold")).pack(pady=(15, 5))
@@ -207,6 +266,9 @@ def create_gui():
 
     btn_open_ia = tk.Button(frame, text="Open IA Docs", command=lambda: open_url("http://localhost:5000/docs"), width=25)
     btn_open_ia.pack(pady=2)
+
+    btn_open_gmail = tk.Button(frame, text="Open Gmail API", command=lambda: open_url("http://localhost:8082"), width=25)
+    btn_open_gmail.pack(pady=2)
 
     # --- Stop button ---
     stop_button = tk.Button(frame, text="Stop All Services", command=stop_all_services, bg="red", fg="white", width=25)

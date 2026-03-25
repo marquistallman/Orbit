@@ -118,3 +118,24 @@ ALTER TABLE "function_parameters" ADD FOREIGN KEY ("function_id") REFERENCES "fu
 ALTER TABLE "user_permissions" ADD FOREIGN KEY ("user_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
 
 ALTER TABLE "user_permissions" ADD FOREIGN KEY ("function_id") REFERENCES "functions" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+-- GMAIL SERVICE TABLES --
+
+CREATE TABLE "emails" (
+  "id" uuid PRIMARY KEY,
+  "user_id" uuid NOT NULL,
+  "gmail_id" varchar UNIQUE NOT NULL,
+  "thread_id" varchar,
+  "subject" text,
+  "snippet" text,
+  "sender" varchar,
+  "recipient" varchar,
+  "received_at" timestamp,
+  "body_html" text,
+  "body_text" text,
+  "is_read" boolean DEFAULT false,
+  "created_at" timestamp DEFAULT (now())
+);
+
+CREATE INDEX ON "emails" ("user_id");
+CREATE INDEX ON "emails" ("gmail_id");

@@ -37,6 +37,22 @@ services:
       - orbit-network
     # Forzamos a FastAPI a escuchar en 0.0.0.0 para que sea accesible desde fuera
     command: uvicorn main:app --host 0.0.0.0 --port 5000
+  gmail-service:
+    build:
+      context: ./gmail-service
+      dockerfile: Dockerfile
+    ports:
+      - "8082:8082"
+    environment:
+      - DB_HOST=postgres
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+    env_file:
+      - ./.env
+    networks:
+      - orbit-network
+    depends_on:
+      - postgres
   frontend:
     build:
       context: ./frontend
@@ -51,6 +67,27 @@ services:
     # Variable de entorno común para que herramientas como Vite/React expongan el puerto
     environment:
       - HOST=0.0.0.0
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: orbit-prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - orbit-network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: orbit-grafana
+    ports:
+      - "3000:3000"
+    networks:
+      - orbit-network
+    depends_on:
+      - prometheus
+
 networks:
   orbit-network:
     driver: bridge
