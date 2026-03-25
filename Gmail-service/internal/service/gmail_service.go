@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"gmail-service/internal/config"
@@ -125,20 +126,32 @@ func getHeader(headers []*gmail.MessagePartHeader, name string) string {
 }
 
 func getBodyFromPayload(payload *gmail.MessagePart) string {
-	if payload.Body != nil && payload.Body.Data != "" {
-		data, _ := base64.URLEncoding.DecodeString(payload.Body.Data)
-		return string(data)
-	}
-	for _, part := range payload.Parts {
-		if part.MimeType == "text/html" || part.MimeType == "text/plain" {
-			if part.Body != nil && part.Body.Data != "" {
-				data, _ := base64.URLEncoding.DecodeString(part.Body.Data)
-				return string(data)
+	var html, text string
+
+	var walker func(*gmail.MessagePart)
+	walker = func(p *gmail.MessagePart) {
+		if p.Body != nil && p.Body.Data != "" {
+			data, err := base64.RawURLEncoding.DecodeString(p.Body.Data)
+			if err != nil {
+				data, _ = base64.URLEncoding.DecodeString(p.Body.Data)
+			}
+
+			mime := strings.ToLower(p.MimeType)
+			if mime == "text/html" && html == "" {
+				html = string(data)
+			} else if mime == "text/plain" && text == "" {
+				text = string(data)
 			}
 		}
-		if len(part.Parts) > 0 {
-			return getBodyFromPayload(part)
+		for _, child := range p.Parts {
+			walker(child)
 		}
 	}
-	return ""
+
+	walker(payload)
+
+	if html != "" {
+		return html
+	}
+	return text
 }

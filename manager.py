@@ -154,6 +154,24 @@ def stop_all_services():
     command = "docker-compose down"
     run_command(command)
 
+def build_service(service_name):
+    """Builds a specific service using docker-compose."""
+    command = f"docker-compose build {service_name}"
+    run_command(command)
+
+def open_build_selector():
+    """Opens a window to select which service to build."""
+    selector = tk.Toplevel()
+    selector.title("Build Service")
+    selector.geometry("300x220")
+
+    tk.Label(selector, text="Select service to build:", font=("Helvetica", 10, "bold")).pack(pady=10)
+
+    services = [("Auth Service", "auth-service"), ("IA Service", "ia-service"), ("Gmail Service", "gmail-service"), ("Frontend", "frontend")]
+
+    for label, service in services:
+        tk.Button(selector, text=label, command=lambda s=service: [build_service(s), selector.destroy()], width=20).pack(pady=2)
+
 def open_url(url):
     """Opens the given URL in the default web browser."""
     webbrowser.open(url)
@@ -261,6 +279,9 @@ def create_gui():
     # --- Start buttons ---
     start_all_button = tk.Button(frame, text="Start All Services", command=start_all_services, width=25)
     start_all_button.pack(pady=5)
+
+    build_button = tk.Button(frame, text="Build Single Service", command=open_build_selector, width=25)
+    build_button.pack(pady=5)
 
     # --- Configuration ---
     config_button = tk.Button(frame, text="Configure Secrets (.env)", command=open_secrets_manager, width=25)

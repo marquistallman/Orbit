@@ -20,14 +20,22 @@ const authHeaders = (): Record<string, string> => {
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
+// Helper to decode HTML entities like &#39; into readable characters
+const decodeHtml = (str: string): string => {
+  if (!str) return ''
+  const txt = document.createElement('textarea')
+  txt.innerHTML = str
+  return txt.value
+}
+
 // Helper to map Gmail Service response to Message interface
 const mapGmailToMessage = (e: any): Message => ({
   id: e.id || e.gmail_id,
   from: e.sender ? e.sender.split('<')[0].trim() : 'Unknown',
   email: e.sender && e.sender.includes('<') ? e.sender.match(/<(.+)>/)?.[1] || '' : e.sender,
   subject: e.subject || '(No Subject)',
-  preview: e.snippet || '',
-  body: e.body_html || e.snippet || '',
+  preview: decodeHtml(e.snippet || ''),
+  body: decodeHtml(e.body_html || e.BodyHTML || e.body || e.snippet || ''),
   date: e.received_at ? new Date(e.received_at).toLocaleDateString() : 'Unknown',
   source: 'gmail',
   read: true,

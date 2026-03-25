@@ -32,10 +32,11 @@ class Agent:
 
                 # Propagamos headers si tenemos un token
                 headers = {"Authorization": token} if token else {}
-                
-                # Si es lectura de gmail, el microservicio espera userId en los params
-                # Por ahora lo pasamos vacío para que el microservicio use el token para identificarlo
+
+                # Pasamos la tarea como payload base
                 payload = {"task": task}
+                # Nota: Si el agente necesita userId para herramientas en segundo plano,
+                # se podría extraer del token JWT aquí mismo.
                 
                 tool_result = execute_tool(tool_used, payload, headers=headers)
 

@@ -63,7 +63,11 @@ func (r *PostgresEmailRepository) SaveEmail(e domain.Email) error {
 	query := `
 		INSERT INTO emails (id, user_id, gmail_id, subject, snippet, sender, received_at, body_html, created_at)
 		VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, NOW())
-		ON CONFLICT (gmail_id) DO NOTHING`
+		ON CONFLICT (gmail_id) DO UPDATE SET 
+			subject = EXCLUDED.subject,
+			snippet = EXCLUDED.snippet,
+			body_html = EXCLUDED.body_html,
+			received_at = EXCLUDED.received_at`
 
 	_, err := r.DB.Exec(query,
 		e.UserID,
