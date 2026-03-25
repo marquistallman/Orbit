@@ -1,77 +1,136 @@
-from fastapi import APIRouter
+from typing import Any
+from datetime import datetime
+from enum import Enum
+from fastapi import APIRouter, HTTPException, Request
+from pydantic import BaseModel, Field
+
 from agents.agent import Agent
 from agents.task_memory import get_task, get_history
 from tools.registry import get_tools
 from tools.tool_executor import execute_tool
+from utils.logger import logger
 
 router = APIRouter()
 
 agent = Agent()
 
 
+class AgentRunRequest(BaseModel):
+    task: str = Field(..., min_length=1)
+
+
+class AgentActionRequest(BaseModel):
+    tool: str = Field(..., min_length=1)
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class AgentToolRequest(BaseModel):
+    tool_id: str = Field(..., min_length=1)
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class TaskStatusEnum(str, Enum):
+    RUNNING = "running"
+    COMPLETED = "completed"
+    ERROR = "error"
+
+
+class AgentRunResponse(BaseModel):
+    task_id: str
+    task: str
+    status: TaskStatusEnum | None = None
+    tool_used: str | None = None
+    tool_result: Any = None
+    response: str | None = None
+    error: str | None = None
+    created_at: str | None = None
+
+
+class ToolInfo(BaseModel):
+    description: str
+    endpoint: str
+
+
+class ToolsListResponse(BaseModel):
+    tools: dict[str, ToolInfo]
+
+
+class ActionResponse(BaseModel):
+    tool: str
+    result: Any  # Can be dict, string, or any other type
+
+
+class ToolResponse(BaseModel):
+    result: Any  # Can be dict, string, or any other type
+
+
+class TaskDetail(BaseModel):
+    task: str
+    status: TaskStatusEnum
+    result: Any = None
+    created_at: str | None = None
+
+
+class TaskHistoryResponse(BaseModel):
+    tasks: list[TaskDetail]
+
+
 # -------------------------
 # RUN AGENT
 # -------------------------
 
-@router.post("/agent/run")
-def run_agent(data: dict):
-
-    task = data.get("task")
-
-    return agent.run(task)
+@router.post("/agent/run", response_model=AgentRunResponse)
+def run_agent(data: AgentRunRequest, request: Request):
+    token = request.headers.get("Authorization")
+    return agent.run(data.task, token=token)
 
 
 # -------------------------
 # LIST TOOLS
 # -------------------------
 
-@router.get("/agent/tools")
+@router.get("/agent/tools", response_model=ToolsListResponse)
 def list_tools():
-
-    return get_tools()
+    return {"tools": get_tools()}
 
 
 # -------------------------
 # EXECUTE ACTION
 # -------------------------
 
-@router.post("/agent/action")
-def run_action(data: dict):
-
-    tool = data.get("tool")
-    payload = data.get("payload")
-
-    result = execute_tool(tool, payload)
+@router.post("/agent/action", response_model=ActionResponse)
+def run_action(data: AgentActionRequest, request: Request):
+    logger.info(f"--- Action Request: {data.tool} ---")
+    token = request.headers.get("Authorization")
+    
+    result = execute_tool(data.tool, data.payload, headers={"Authorization": token} if token else None)
+    
+    if isinstance(result, dict) and "error" in result:
+        logger.error(f"Tool execution failed: {result['error']}")
+        raise HTTPException(status_code=502, detail=result["error"])
+    else:
+        logger.info(f"Tool {data.tool} executed successfully")
 
     return {
-        "tool": tool,
+        "tool": data.tool,
         "result": result
     }
 
 
-# -------------------------
-# EXECUTE TOOL DIRECTLY
-# -------------------------
-
-@router.post("/agent/tool")
-def run_tool(data: dict):
-
-    tool_id = data.get("tool_id")
-    payload = data.get("payload")
-
-    result = execute_tool(tool_id, payload)
-
-    return result
+@router.post("/agent/tool", response_model=ToolResponse)
+def run_tool(data: AgentToolRequest, request: Request):
+    token = request.headers.get("Authorization")
+    result = execute_tool(data.tool_id, data.payload, headers={"Authorization": token} if token else None)
+    return {"result": result}
 
 
-# -------------------------
-# TASK STATUS
-# -------------------------
-
-@router.get("/agent/status/{task_id}")
+@router.get("/agent/status/{task_id}", response_model=TaskDetail)
 def get_status(task_id: str):
 
     task = get_task(task_id)
+
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
 
     return task
 
@@ -80,7 +139,6 @@ def get_status(task_id: str):
 # TASK HISTORY
 # -------------------------
 
-@router.get("/agent/history")
+@router.get("/agent/history", response_model=TaskHistoryResponse)
 def history():
-
-    return get_history()
+    return {"tasks": get_history()}

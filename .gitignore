@@ -172,6 +172,10 @@ jspm_packages/
 # TypeScript cache
 *.tsbuildinfo
 
+# Vite local cache
+.vite/
+frontend/.vite/
+
 # Optional npm cache directory
 .npm
 
@@ -449,3 +453,5 @@ docker-compose.override.yml
 .env.docker
 .docker/
 frontend/.env
+
+IA-service/.env

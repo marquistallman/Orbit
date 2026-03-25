@@ -54,6 +54,23 @@ def check_or_create_frontend_env():
     else:
         print("Warning: frontend directory not found.")
 
+def check_or_create_ia_env():
+    """Checks for IA-service/.env and creates it if not found, and adds it to .gitignore."""
+    ia_dir = "IA-service"
+    env_path = os.path.join(ia_dir, ".env")
+    
+    if os.path.exists(ia_dir):
+        if not os.path.exists(env_path):
+            with open(env_path, "w") as f:
+                f.write("OPENROUTER_API_KEY=your_api_key_here\n")
+                f.write("TOKEN_VAULT_URL=http://localhost:8080\n")
+            print(f"Created {env_path} with default values.")
+        
+        # Ensure ignored in root .gitignore
+        add_to_gitignore("IA-service/.env")
+    else:
+        print("Warning: IA-service directory not found.")
+
 def add_to_gitignore(entry):
     """Adds a pattern to .gitignore if it doesn't exist."""
     gitignore_path = ".gitignore"
@@ -137,6 +154,24 @@ def stop_all_services():
     command = "docker-compose down"
     run_command(command)
 
+def build_service(service_name):
+    """Builds a specific service using docker-compose."""
+    command = f"docker-compose build {service_name}"
+    run_command(command)
+
+def open_build_selector():
+    """Opens a window to select which service to build."""
+    selector = tk.Toplevel()
+    selector.title("Build Service")
+    selector.geometry("300x220")
+
+    tk.Label(selector, text="Select service to build:", font=("Helvetica", 10, "bold")).pack(pady=10)
+
+    services = [("Auth Service", "auth-service"), ("IA Service", "ia-service"), ("Gmail Service", "gmail-service"), ("Frontend", "frontend")]
+
+    for label, service in services:
+        tk.Button(selector, text=label, command=lambda s=service: [build_service(s), selector.destroy()], width=20).pack(pady=2)
+
 def open_url(url):
     """Opens the given URL in the default web browser."""
     webbrowser.open(url)
@@ -165,7 +200,11 @@ def open_secrets_manager():
         ("Frontend / frontend/.env", [
             ("VITE API URL (Auth)", "VITE_API_URL", ""),
             ("VITE IA URL (Agent)", "VITE_IA_URL", "")
-        ], os.path.join("frontend", ".env"))
+        ], os.path.join("frontend", ".env")),
+        ("IA Service / IA-service/.env", [
+            ("OpenRouter API Key", "OPENROUTER_API_KEY", "*"),
+            ("Token Vault URL", "TOKEN_VAULT_URL", "")
+        ], os.path.join("IA-service", ".env"))
     ]
     
     entries_map = {} # Maps key -> (EntryWidget, FilePath)
@@ -229,6 +268,7 @@ def create_gui():
     # Ensure .env file exists before doing anything else
     check_or_create_env_file()
     check_or_create_frontend_env()
+    check_or_create_ia_env()
 
     frame = tk.Frame(root, padx=10, pady=10)
     frame.pack(padx=10, pady=10)
@@ -239,6 +279,9 @@ def create_gui():
     # --- Start buttons ---
     start_all_button = tk.Button(frame, text="Start All Services", command=start_all_services, width=25)
     start_all_button.pack(pady=5)
+
+    build_button = tk.Button(frame, text="Build Single Service", command=open_build_selector, width=25)
+    build_button.pack(pady=5)
 
     # --- Configuration ---
     config_button = tk.Button(frame, text="Configure Secrets (.env)", command=open_secrets_manager, width=25)

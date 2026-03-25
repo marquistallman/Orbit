@@ -1,27 +1,15 @@
-import os
-from fastapi import FastAPI, Request, HTTPException, Depends, status
-from fastapi.security import OAuth2PasswordBearer
+import logging
+# Configuración básica para asegurar que los logs salgan a stdout inmediatamente
+logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from dotenv import load_dotenv
-import requests
-from ai.model_client import call_model
-from agents.agent import tool_manager
-from ai.memory import Memory
-from jose import JWTError, jwt
-from prometheus_fastapi_instrumentator import Instrumentator
+from routes.agent_routes import router as agent_router
 
-load_dotenv()
-
-app = FastAPI()
-
-# Inicializar instrumentación de Prometheus
-Instrumentator().instrument(app).expose(app)
-
-# --- Configuración de Seguridad y CORS ---
-
-SECRET_KEY = os.getenv("JWT_SECRET")
-ALGORITHM = "HS256"
+app = FastAPI(
+    title="AI Agent Service",
+    version="1.0"
+)
 
 # Orígenes permitidos (tu frontend)
 origins = [
@@ -36,75 +24,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token") # No la usaremos directamente, pero es necesaria para la dependencia
-
-async def get_current_user(token: str = Depends(oauth2_scheme)):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("email")
-        if email is None:
-            raise credentials_exception
-        return payload
-    except JWTError:
-        raise credentials_exception
-
-# --- Fin de Configuración de Seguridad ---
-
-class AgentRequest(BaseModel):
-    task: str
-
-class ActionRequest(BaseModel):
-    tool: str
-    payload: dict = {}
-
-memory = Memory("memory.db")
-
-@app.post("/agent/run")
-async def run_agent(agent_request: AgentRequest, current_user: dict = Depends(get_current_user)):
-    task = agent_request.task
-
-    if not task:
-        raise HTTPException(status_code=400, detail="Task is required")
-
-    # Check memory
-    memory_result = memory.get_memory(task)
-    if memory_result:
-        return memory_result
-
-    # Simulate calling the LLM (OpenRouter)
-    messages = [{"role": "user", "content": task}]
-    result = call_model(messages)
-
-    # Save to memory
-    memory.save_memory(task, result)
-
-    return {"result": result}
-
-@app.post("/agent/action")
-async def agent_action(request: ActionRequest):
-    # Endpoint compatible con la llamada del frontend (tools) para evitar fallos de conexión
-    return {"result": {"messages": []}}
+app.include_router(agent_router)
 
 @app.get("/")
 def health_check():
     return {"status": "IA-service is running"}
 
-@app.get("/agent/status/{task_id}")
-async def get_agent_status(task_id: str):
-    # Simulate getting the status of a task
-    return {"status": "completed", "task_id": task_id}
-
-@app.get("/agent/history")
-async def get_agent_history():
-    # Simulate getting the history of tasks
-    return {"history": ["task1", "task2", "task3"]}
-
-@app.get("/agent/tools")
-async def get_agent_tools():
-    # Simulate getting the list of tools available
-    return tool_manager.list_tools()
+# Endpoint para evitar 404 de Prometheus
+@app.get("/metrics")
+def metrics():
+    return {"status": "ok"}
