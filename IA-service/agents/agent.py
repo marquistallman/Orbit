@@ -8,14 +8,9 @@ from utils.logger import logger
 class Agent:
 
     def run(self, task: str):
-        """
-        Main entry point of the agent.
-        Executes a task using the LLM and optional tools.
-        """
 
         logger.info(f"Agent received task: {task}")
 
-        # Create task in memory
         task_id = create_task(task)
 
         tool_used = None
@@ -26,17 +21,13 @@ class Agent:
             # -------------------------
             # TOOL SELECTION
             # -------------------------
-
             tool_used = select_tool(task)
-
             logger.info(f"Tool selected: {tool_used}")
 
             # -------------------------
             # TOOL EXECUTION
             # -------------------------
-
             if tool_used:
-
                 logger.info(f"Executing tool: {tool_used}")
 
                 tool_result = execute_tool(tool_used, {"task": task})
@@ -44,13 +35,34 @@ class Agent:
                 logger.info(f"Tool result: {tool_result}")
 
             # -------------------------
+            # SYSTEM PROMPT (MEJORADO)
+            # -------------------------
+            system_prompt = "You are an AI assistant."
+
+            if "email" in task.lower():
+                system_prompt = (
+                    "You are an expert email writer. "
+                    "Write clear, polite, well-structured emails."
+                )
+
+            elif "finance" in task.lower():
+                system_prompt = (
+                    "You are a financial analyst. "
+                    "Provide clear insights, risks, and recommendations."
+                )
+
+            elif "document" in task.lower():
+                system_prompt = (
+                    "You generate structured content suitable for documents."
+                )
+
+            # -------------------------
             # PREPARE LLM MESSAGES
             # -------------------------
-
             messages = [
                 {
                     "role": "system",
-                    "content": "You are an AI assistant capable of solving tasks."
+                    "content": system_prompt
                 }
             ]
 
@@ -68,13 +80,31 @@ class Agent:
             # -------------------------
             # CALL LLM
             # -------------------------
-
             logger.info("Calling LLM")
 
             response = call_model(messages)
 
             logger.info(f"LLM response: {response}")
 
+            # -------------------------
+            # AUTO CREATE DOC (si aplica)
+            # -------------------------
+            if tool_used == "document_edit":
+
+                logger.info("Sending content to doc-service")
+
+                doc_payload = {
+                    "title": "Generated Document",
+                    "content": response
+                }
+
+                doc_result = execute_tool("document_edit", doc_payload)
+
+                tool_result = doc_result
+
+            # -------------------------
+            # FINAL RESULT
+            # -------------------------
             result = {
                 "task_id": task_id,
                 "task": task,
@@ -82,10 +112,6 @@ class Agent:
                 "tool_result": tool_result,
                 "response": response
             }
-
-            # -------------------------
-            # FINISH TASK
-            # -------------------------
 
             finish_task(task_id, result)
 
