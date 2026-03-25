@@ -130,9 +130,4 @@ def get_status(task_id: str):
 
 @router.get("/agent/history", response_model=TaskHistoryResponse)
 def history():
-<<<<<<< HEAD
-
-    return get_history()
-=======
     return {"tasks": get_history()}
->>>>>>> origin/Dani
