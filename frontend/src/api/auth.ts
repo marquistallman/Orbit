@@ -1,4 +1,4 @@
-const BASE_URL = import.meta.env.VITE_API_URL || "";
+const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
 export interface User {
   id: string;
@@ -77,3 +77,20 @@ export const updateProfileRequest = async (
   // if (!res.ok) throw new Error("Error al actualizar perfil");
   // return res.json();
 };
+
+export const getMeRequest = async (): Promise<User> => {
+  const token = localStorage.getItem('token')
+  const res = await fetch(`${BASE_URL}/api/auth/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) {
+    const errorBody = await res.text();
+    console.error("getMeRequest failed. Status:", res.status, "Body:", errorBody);
+    throw new Error(`Unauthorized: ${res.status} ${errorBody}`);
+  }
+  return res.json()
+}
+
+export const logoutRequest = async (): Promise<void> => {
+  // Spring Boot es stateless con JWT — el logout es solo del lado del cliente
+}

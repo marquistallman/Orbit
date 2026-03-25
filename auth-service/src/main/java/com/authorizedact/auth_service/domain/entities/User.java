@@ -35,4 +35,10 @@ public class User {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @Column(length = 4096)
+    private String accessToken;
+
+    @Column(length = 4096)
+    private String refreshToken;
 }
