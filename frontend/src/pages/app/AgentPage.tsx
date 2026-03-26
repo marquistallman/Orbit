@@ -19,7 +19,6 @@ export default function AgentPage() {
     return '#C6A15B'
   }, [result?.tool_used])
 
-  // Execute one-shot task against IA-service and render last result.
   const handleRun = async () => {
     if (!canRun) return
     setLoading(true)
@@ -34,7 +33,6 @@ export default function AgentPage() {
     }
   }
 
-  // Fetch tool catalog exposed by backend to validate integration quickly from UI.
   const handleLoadTools = async () => {
     setLoadingTools(true)
     setError(null)
