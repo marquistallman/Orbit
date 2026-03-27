@@ -48,7 +48,7 @@ export default function AppLayout() {
             fontWeight: 600,
             color: '#C6A15B',
             letterSpacing: 2,
-          }}>rbit</span>
+          }}>Orbit</span>
         </NavLink>
 
         {/* Nav */}
