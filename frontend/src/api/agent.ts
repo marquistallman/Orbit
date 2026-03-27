@@ -1,5 +1,5 @@
 // Use explicit IA service URL in dev; fallback to nginx reverse-proxy path in dockerized frontend.
-const BASE_URL = import.meta.env.VITE_IA_URL || 'http://localhost:5000'
+const BASE_URL = import.meta.env.VITE_IA_SERVICE_URL || '/ai'
 
 export interface AgentRunResponse {
   task_id: string

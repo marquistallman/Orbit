@@ -1,93 +1,50 @@
-const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8081";
+const BASE_URL = 'http://localhost:8080'
 
 export interface User {
-  id: string;
-  username: string;
-  email: string;
-  bio?: string;
-  avatar?: string;
+  id: string
+  username: string
+  email: string
+  bio?: string
+  avatar?: string
 }
 
 export interface AuthResponse {
-  token: string;
-  user: User;
+  token: string
+  user: User
 }
 
-// ─── LOGIN ───────────────────────────────────────────
-export const loginRequest = async (
-  email: string,
-  password: string
-): Promise<AuthResponse> => {
-  // REAL:
+export const loginRequest = async (email: string, password: string): Promise<AuthResponse> => {
   const res = await fetch(`${BASE_URL}/api/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
-  });
+  })
   if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.message || "Credenciales inválidas");
+    const err = await res.text()
+    throw new Error(err || 'Credenciales inválidas')
   }
-  const responseData = await res.json();
-  // Mapeo: El backend devuelve 'userDto', pero el frontend espera 'user'.
-  const authResponse: AuthResponse = { token: responseData.token, user: responseData.userDto };
-  return authResponse;
-};
+  return res.json()
+}
 
-// ─── REGISTER ────────────────────────────────────────
-export const registerRequest = async (
-  name: string,
-  email: string,
-  password: string
-): Promise<AuthResponse> => {
-  // REAL:
+export const registerRequest = async (username: string, email: string, password: string): Promise<AuthResponse> => {
   const res = await fetch(`${BASE_URL}/api/auth/register`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username: name, email, password }),
-  });
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, email, password }),
+  })
   if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.message || "Error al registrar");
+    const err = await res.text()
+    throw new Error(err || 'Error al crear cuenta')
   }
-  const responseData = await res.json();
-  // Mapeo: El backend devuelve 'userDto', pero el frontend espera 'user'.
-  const authResponse: AuthResponse = { token: responseData.token, user: responseData.userDto };
-  return authResponse;
-};
-
-// ─── UPDATE PROFILE ───────────────────────────────────
-export const updateProfileRequest = async (
-  data: Partial<User>
-): Promise<User> => {
-  // MOCK
-  await new Promise((r) => setTimeout(r, 800));
-  return { id: "1", username: "Luis Carlos", email: "test@test.com", ...data };
-
-  // REAL:
-  // const token = localStorage.getItem("token");
-  // const res = await fetch(`${BASE_URL}/api/auth/me`, {
-  //   method: "PUT",
-  //   headers: {
-  //     "Content-Type": "application/json",
-  //     Authorization: `Bearer ${token}`,
-  //   },
-  //   body: JSON.stringify(data),
-  // });
-  // if (!res.ok) throw new Error("Error al actualizar perfil");
-  // return res.json();
-};
+  return res.json()
+}
 
 export const getMeRequest = async (): Promise<User> => {
   const token = localStorage.getItem('token')
   const res = await fetch(`${BASE_URL}/api/auth/me`, {
     headers: { Authorization: `Bearer ${token}` },
   })
-  if (!res.ok) {
-    const errorBody = await res.text();
-    console.error("getMeRequest failed. Status:", res.status, "Body:", errorBody);
-    throw new Error(`Unauthorized: ${res.status} ${errorBody}`);
-  }
+  if (!res.ok) throw new Error('Unauthorized')
   return res.json()
 }
 

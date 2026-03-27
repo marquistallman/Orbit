@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import AuthCard from '../../components/ui/AuthCard'
 import AuthInput from '../../components/ui/AuthInput'
 import AuthButton from '../../components/ui/AuthButton'
@@ -29,26 +29,11 @@ const FacebookIcon = () => (
 
 export default function LoginPage() {
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
   const setAuth = useAuthStore(s => s.setAuth)
   const [form, setForm] = useState({ email: '', password: '' })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
   const [authError, setAuthError] = useState('')
-
-  useEffect(() => {
-    // El flujo de éxito ahora lo maneja OAuthCallbackPage.
-    // Aquí solo escuchamos errores si el backend nos devuelve al login.
-    const errorParam = searchParams.get('error')
-    if (errorParam) {
-      const msg = decodeURIComponent(errorParam)
-      setAuthError(msg === 'oauth_failure' 
-        ? 'No pudimos iniciar sesión con tu cuenta social.' 
-        : msg
-      )
-      window.history.replaceState({}, document.title, window.location.pathname)
-    }
-  }, [searchParams])
 
   const validate = () => {
     const e: Record<string, string> = {}
@@ -110,23 +95,23 @@ export default function LoginPage() {
         )}
 
         <AuthButton type="submit" loading={loading}>Login</AuthButton>
+
+        <p style={{ textAlign: 'center', fontSize: 12, color: '#8C6A3E' }}>
+          Don't have an account?{' '}
+          <Link to="/register" style={{ color: '#C6A15B', textDecoration: 'none', fontWeight: 500 }}>
+            Create an account
+          </Link>
+        </p>
+
+        <OrDivider />
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <SocialButton icon={<GoogleIcon />}   label="Continue with Google"   onClick={() => window.location.href = 'http://localhost:8080/oauth2/authorization/google'} />
+          <SocialButton icon={<LinkedInIcon />} label="Continue with Linkedin" onClick={() => window.location.href = 'http://localhost:8080/oauth2/authorization/linkedin'} />
+          <SocialButton icon={<GithubIcon />}   label="Continue with Github"   onClick={() => window.location.href = 'http://localhost:8080/oauth2/authorization/github'} />
+          <SocialButton icon={<FacebookIcon />} label="Continue with Facebook" onClick={() => window.location.href = 'http://localhost:8080/oauth2/authorization/facebook'} />
+        </div>
       </form>
-
-      <p style={{ textAlign: 'center', fontSize: 12, color: '#8C6A3E', marginTop: 14 }}>
-        Don't have an account?{' '}
-        <Link to="/register" style={{ color: '#C6A15B', textDecoration: 'none', fontWeight: 500 }}>
-          Create an account
-        </Link>
-      </p>
-
-      <OrDivider />
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <SocialButton icon={<GoogleIcon />}   label="Continue with Google"   onClick={() => window.location.href = 'http://localhost:8080/oauth2/authorization/google'} />
-        <SocialButton icon={<LinkedInIcon />} label="Continue with Linkedin" onClick={() => window.location.href = 'http://localhost:8080/oauth2/authorization/linkedin'} />
-        <SocialButton icon={<GithubIcon />}   label="Continue with Github"   onClick={() => window.location.href = 'http://localhost:8080/oauth2/authorization/github'} />
-        <SocialButton icon={<FacebookIcon />} label="Continue with Facebook" onClick={() => window.location.href = 'http://localhost:8080/oauth2/authorization/facebook'} />
-      </div>
     </AuthCard>
   )
 }
