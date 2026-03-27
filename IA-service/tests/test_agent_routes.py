@@ -58,6 +58,27 @@ class TestListToolsEndpoint:
         assert "gmail_read" in data["tools"] or len(data["tools"]) >= 0
 
 
+class TestSelectToolEndpoint:
+    """Tests for POST /agent/select-tool endpoint."""
+
+    def test_select_tool_success(self):
+        response = client.post(
+            "/agent/select-tool",
+            json={"task": "write email to customer"}
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert "tool_id" in data
+        assert isinstance(data["tool_id"], str)
+
+    def test_select_tool_validation(self):
+        response = client.post(
+            "/agent/select-tool",
+            json={"task": ""}
+        )
+        assert response.status_code == 422
+
+
 class TestActionEndpoint:
     """Tests for POST /agent/action endpoint."""
 

@@ -4,6 +4,8 @@ import { useAuthStore } from '../store/authStore'
 const NAV = [
   { to: '/app/apps',     label: 'Apps'      },
   { to: '/app/agent',    label: 'Agent'     },
+  { to: '/app/documents', label: 'Docs'      },
+  { to: '/app/labs',     label: 'Labs'      },
   { to: '/app/finance',  label: 'Finance'   },
   { to: '/app/messages', label: 'Messages'  },
   { to: '/app',          label: 'Dashboard' },

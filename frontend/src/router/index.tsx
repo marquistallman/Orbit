@@ -15,6 +15,8 @@ const AgentPage        = lazy(() => import('../pages/app/AgentPage'))
 const ChatPage         = lazy(() => import('../pages/app/ChatPage'))
 const FinancePage      = lazy(() => import('../pages/app/FinancePage'))
 const MessagesPage     = lazy(() => import('../pages/app/MessagesPage'))
+const DocumentsPage    = lazy(() => import('../pages/app/DocumentsPage'))
+const LabsPage         = lazy(() => import('../pages/app/LabsPage'))
 const AppsPage         = lazy(() => import('../pages/app/AppsPage'))
 const ProfilePage      = lazy(() => import('../pages/app/ProfilePage'))
 const EditProfilePage  = lazy(() => import('../pages/app/EditProfilePage'))
@@ -52,6 +54,8 @@ export const router = createBrowserRouter([
       { path: 'chat',         element: <Suspense fallback={<Loader />}><ChatPage /></Suspense> },
       { path: 'finance',      element: <Suspense fallback={<Loader />}><FinancePage /></Suspense> },
       { path: 'messages',     element: <Suspense fallback={<Loader />}><MessagesPage /></Suspense> },
+      { path: 'documents',    element: <Suspense fallback={<Loader />}><DocumentsPage /></Suspense> },
+      { path: 'labs',         element: <Suspense fallback={<Loader />}><LabsPage /></Suspense> },
       { path: 'apps',         element: <Suspense fallback={<Loader />}><AppsPage /></Suspense> },
       { path: 'profile',      element: <Suspense fallback={<Loader />}><ProfilePage /></Suspense> },
       { path: 'profile/edit', element: <Suspense fallback={<Loader />}><EditProfilePage /></Suspense> },

@@ -22,6 +22,26 @@ def check_or_create_env_file():
             f.write(f"POSTGRES_PASSWORD={db_password}\n\n")
             f.write(f"# JWT Secret Key\n")
             f.write(f"JWT_SECRET={jwt_secret}\n")
+            f.write(f"\n# IA Service\n")
+            f.write(f"OPENROUTER_API_KEY=your_openrouter_key_here\n")
+            f.write(f"OPENROUTER_MODEL=openai/gpt-4o-mini\n")
+            f.write(f"HTTP_TIMEOUT_SECONDS=20\n")
+            f.write(f"GMAIL_SERVICE_URL=http://gmail-service:8082\n")
+            f.write(f"DOC_SERVICE_URL=http://doc-service:9002\n")
+            f.write(f"CODE_SERVICE_URL=http://code-service:9003\n")
+            f.write(f"CODE_MAX_MEMORY_MB=128\n")
+            f.write(f"CODE_MAX_STDIN_CHARS=4000\n")
+            f.write(f"CODE_MAX_SQL_RESULT_ROWS=200\n")
+            f.write(f"CODE_MAX_SQL_STATEMENTS=30\n")
+            f.write(f"CODE_STRICT_MODE=true\n")
+            f.write(f"CODE_PYTHON_ALLOWED_IMPORTS=math,statistics,decimal,datetime,time,json,csv,sqlite3,collections,itertools,functools,fractions,random,re,typing,pathlib,openpyxl\n")
+            f.write(f"CODE_JS_ALLOWED_MODULES=\n")
+            f.write(f"CODE_PYTHON_BLOCK_PATTERNS=\n")
+            f.write(f"CODE_JS_BLOCK_PATTERNS=\n")
+            f.write(f"CODE_SQL_BLOCK_PATTERNS=\n")
+            f.write(f"CODE_SNIPPETS_DB_PATH=/data/snippets.db\n")
+            f.write(f"EXCEL_SERVICE_URL=http://excel-service:9004\n")
+            f.write(f"MINI_MAPS_SERVICE_URL=http://mini-maps-service:9005\n")
             f.write(f"\n# OAuth2 Credentials\n")
             f.write(f"GOOGLE_CLIENT_ID=placeholder\n")
             f.write(f"GOOGLE_CLIENT_SECRET=placeholder\n")
@@ -47,6 +67,11 @@ def check_or_create_frontend_env():
             with open(env_path, "w") as f:
                 f.write("VITE_API_URL=http://localhost:8080\n")
                 f.write("VITE_IA_URL=http://localhost:5000\n")
+                f.write("VITE_GMAIL_URL=http://localhost:8082\n")
+                f.write("VITE_DOC_URL=http://localhost:9002\n")
+                f.write("VITE_EXCEL_URL=http://localhost:9004\n")
+                f.write("VITE_CODE_URL=http://localhost:9003\n")
+                f.write("VITE_MINI_MAPS_URL=http://localhost:9005\n")
             print(f"Created {env_path} with default values.")
         
         # Ensure ignored in root .gitignore
@@ -167,7 +192,16 @@ def open_build_selector():
 
     tk.Label(selector, text="Select service to build:", font=("Helvetica", 10, "bold")).pack(pady=10)
 
-    services = [("Auth Service", "auth-service"), ("IA Service", "ia-service"), ("Gmail Service", "gmail-service"), ("Frontend", "frontend")]
+    services = [
+        ("Auth Service", "auth-service"),
+        ("IA Service", "ia-service"),
+        ("Gmail Service", "gmail-service"),
+        ("Doc Service", "doc-service"),
+        ("Excel Service", "excel-service"),
+        ("Code Service", "code-service"),
+        ("Mini Maps", "mini-maps-service"),
+        ("Frontend", "frontend")
+    ]
 
     for label, service in services:
         tk.Button(selector, text=label, command=lambda s=service: [build_service(s), selector.destroy()], width=20).pack(pady=2)
@@ -195,11 +229,35 @@ def open_secrets_manager():
             ("Facebook Secret", "FACEBOOK_CLIENT_SECRET", "*"),
             ("LinkedIn Client ID", "LINKEDIN_CLIENT_ID", "*"),
             ("LinkedIn Secret", "LINKEDIN_CLIENT_SECRET", "*"),
+            ("OpenRouter API Key", "OPENROUTER_API_KEY", "*"),
+            ("OpenRouter Model", "OPENROUTER_MODEL", ""),
+            ("HTTP Timeout Seconds", "HTTP_TIMEOUT_SECONDS", ""),
+            ("Gmail Service URL", "GMAIL_SERVICE_URL", ""),
+            ("Doc Service URL", "DOC_SERVICE_URL", ""),
+            ("Code Service URL", "CODE_SERVICE_URL", ""),
+            ("Code Service Max Memory (MB)", "CODE_MAX_MEMORY_MB", ""),
+            ("Code Service Max STDIN Chars", "CODE_MAX_STDIN_CHARS", ""),
+            ("Code Service Max SQL Rows", "CODE_MAX_SQL_RESULT_ROWS", ""),
+            ("Code Service Max SQL Statements", "CODE_MAX_SQL_STATEMENTS", ""),
+            ("Code Strict Mode", "CODE_STRICT_MODE", ""),
+            ("Code Python Allowed Imports", "CODE_PYTHON_ALLOWED_IMPORTS", ""),
+            ("Code JS Allowed Modules", "CODE_JS_ALLOWED_MODULES", ""),
+            ("Code Python Block Patterns", "CODE_PYTHON_BLOCK_PATTERNS", ""),
+            ("Code JS Block Patterns", "CODE_JS_BLOCK_PATTERNS", ""),
+            ("Code SQL Block Patterns", "CODE_SQL_BLOCK_PATTERNS", ""),
+            ("Code Snippets DB Path", "CODE_SNIPPETS_DB_PATH", ""),
+            ("Excel Service URL", "EXCEL_SERVICE_URL", ""),
+            ("Mini Maps Service URL", "MINI_MAPS_SERVICE_URL", ""),
             ("JWT Secret", "JWT_SECRET", "*")
         ], ".env"),
         ("Frontend / frontend/.env", [
             ("VITE API URL (Auth)", "VITE_API_URL", ""),
-            ("VITE IA URL (Agent)", "VITE_IA_URL", "")
+            ("VITE IA URL (Agent)", "VITE_IA_URL", ""),
+            ("VITE Gmail URL", "VITE_GMAIL_URL", ""),
+            ("VITE Doc Service URL", "VITE_DOC_URL", ""),
+            ("VITE Excel Service URL", "VITE_EXCEL_URL", ""),
+            ("VITE Code Service URL", "VITE_CODE_URL", ""),
+            ("VITE Mini Maps Service URL", "VITE_MINI_MAPS_URL", "")
         ], os.path.join("frontend", ".env")),
         ("IA Service / IA-service/.env", [
             ("OpenRouter API Key", "OPENROUTER_API_KEY", "*"),
@@ -288,7 +346,16 @@ def create_gui():
     config_button.pack(pady=5)
     
     # --- Individual Service Controls ---
-    services = [("Auth Service", "auth-service"), ("IA Service", "ia-service"), ("Gmail Service", "gmail-service"), ("Frontend", "frontend")]
+    services = [
+        ("Auth Service", "auth-service"),
+        ("IA Service", "ia-service"),
+        ("Gmail Service", "gmail-service"),
+        ("Doc Service", "doc-service"),
+        ("Excel Service", "excel-service"),
+        ("Code Service", "code-service"),
+        ("Mini Maps", "mini-maps-service"),
+        ("Frontend", "frontend")
+    ]
     
     for label, service in services:
         row_frame = tk.Frame(frame)

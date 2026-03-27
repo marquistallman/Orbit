@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 from agents.agent import Agent
 from agents.task_memory import get_task, get_history
 from tools.registry import get_tools
+from tools.tool_selector import select_tool
 from tools.tool_executor import execute_tool
 from utils.logger import logger
 
@@ -27,6 +28,10 @@ class AgentActionRequest(BaseModel):
 class AgentToolRequest(BaseModel):
     tool_id: str = Field(..., min_length=1)
     payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class SelectToolRequest(BaseModel):
+    task: str = Field(..., min_length=1)
 
 
 class TaskStatusEnum(str, Enum):
@@ -53,6 +58,10 @@ class ToolInfo(BaseModel):
 
 class ToolsListResponse(BaseModel):
     tools: dict[str, ToolInfo]
+
+
+class SelectToolResponse(BaseModel):
+    tool_id: str
 
 
 class ActionResponse(BaseModel):
@@ -92,6 +101,12 @@ def run_agent(data: AgentRunRequest, request: Request):
 @router.get("/agent/tools", response_model=ToolsListResponse)
 def list_tools():
     return {"tools": get_tools()}
+
+
+@router.post("/agent/select-tool", response_model=SelectToolResponse)
+def select_tool_for_task(data: SelectToolRequest):
+    tool_id = select_tool(data.task) or "none"
+    return {"tool_id": tool_id}
 
 
 # -------------------------
