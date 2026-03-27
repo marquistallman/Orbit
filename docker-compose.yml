@@ -12,12 +12,13 @@ services:
     # Load environment variables from the .env file
     env_file:
       - ./.env
+      - ./.env.local
   auth-service:
     build:
       context: ./auth-service
       dockerfile: Dockerfile
     ports:
-      - "8080:8080"
+      - "8081:8080"
     environment:
       - DB_HOST=postgres
     networks:
@@ -25,6 +26,7 @@ services:
     # Load environment variables from the .env file
     env_file:
       - ./.env
+      - ./.env.local
   ia-service:
     build:
       context: ./IA-service
@@ -34,6 +36,7 @@ services:
     # Load environment variables from the .env file
     env_file:
       - ./.env
+      - ./.env.local
     environment:
       - PYTHONUNBUFFERED=1
     networks:
@@ -52,6 +55,7 @@ services:
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
     env_file:
       - ./.env
+      - ./.env.local
     networks:
       - orbit-network
     depends_on:

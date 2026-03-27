@@ -25,10 +25,18 @@ def check_or_create_env_file():
             f.write(f"\n# IA Service\n")
             f.write(f"OPENROUTER_API_KEY=your_openrouter_key_here\n")
             f.write(f"OPENROUTER_MODEL=openai/gpt-4o-mini\n")
+            f.write(f"OPENROUTER_SITE_URL=http://localhost:5173\n")
+            f.write(f"OPENROUTER_APP_NAME=Orbit\n")
+            f.write(f"CORS_ALLOWED_ORIGINS=http://localhost:5173\n")
+            f.write(f"CORS_ALLOW_CREDENTIALS=true\n")
             f.write(f"HTTP_TIMEOUT_SECONDS=20\n")
             f.write(f"GMAIL_SERVICE_URL=http://gmail-service:8082\n")
+            f.write(f"TOKEN_VAULT_URL=http://auth-service:8080\n")
             f.write(f"DOC_SERVICE_URL=http://doc-service:9002\n")
             f.write(f"CODE_SERVICE_URL=http://code-service:9003\n")
+            f.write(f"CODE_EXEC_TIMEOUT_SECONDS=5\n")
+            f.write(f"CODE_MAX_CHARS=12000\n")
+            f.write(f"CODE_MAX_OUTPUT_CHARS=4000\n")
             f.write(f"CODE_MAX_MEMORY_MB=128\n")
             f.write(f"CODE_MAX_STDIN_CHARS=4000\n")
             f.write(f"CODE_MAX_SQL_RESULT_ROWS=200\n")
@@ -42,6 +50,37 @@ def check_or_create_env_file():
             f.write(f"CODE_SNIPPETS_DB_PATH=/data/snippets.db\n")
             f.write(f"EXCEL_SERVICE_URL=http://excel-service:9004\n")
             f.write(f"MINI_MAPS_SERVICE_URL=http://mini-maps-service:9005\n")
+            f.write(f"\n# Integrations - Delivery Apps\n")
+            f.write(f"CONNECTOR_DELIVERY_ENABLED=false\n")
+            f.write(f"DELIVERY_API_URL=\n")
+            f.write(f"DELIVERY_API_KEY=\n")
+            f.write(f"\n# Integrations - Messaging (WhatsApp / Telegram)\n")
+            f.write(f"CONNECTOR_WHATSAPP_ENABLED=false\n")
+            f.write(f"WHATSAPP_PROVIDER=\n")
+            f.write(f"WHATSAPP_API_URL=\n")
+            f.write(f"WHATSAPP_ACCESS_TOKEN=\n")
+            f.write(f"WHATSAPP_PHONE_NUMBER_ID=\n")
+            f.write(f"CONNECTOR_TELEGRAM_ENABLED=false\n")
+            f.write(f"TELEGRAM_BOT_TOKEN=\n")
+            f.write(f"TELEGRAM_API_URL=https://api.telegram.org\n")
+            f.write(f"\n# Integrations - Reservations\n")
+            f.write(f"CONNECTOR_RESERVATIONS_ENABLED=false\n")
+            f.write(f"RESERVATIONS_API_URL=\n")
+            f.write(f"RESERVATIONS_API_KEY=\n")
+            f.write(f"\n# Integrations - Public Transport\n")
+            f.write(f"CONNECTOR_TRANSPORT_ENABLED=false\n")
+            f.write(f"PUBLIC_TRANSPORT_API_URL=\n")
+            f.write(f"PUBLIC_TRANSPORT_API_KEY=\n")
+            f.write(f"\n# Integrations - Brokers\n")
+            f.write(f"CONNECTOR_BROKER_ENABLED=false\n")
+            f.write(f"BROKER_API_URL=\n")
+            f.write(f"BROKER_API_KEY=\n")
+            f.write(f"BROKER_API_SECRET=\n")
+            f.write(f"\n# Integrations - Banking\n")
+            f.write(f"CONNECTOR_BANK_ENABLED=false\n")
+            f.write(f"BANK_API_URL=\n")
+            f.write(f"BANK_API_KEY=\n")
+            f.write(f"BANK_API_SECRET=\n")
             f.write(f"\n# OAuth2 Credentials\n")
             f.write(f"GOOGLE_CLIENT_ID=placeholder\n")
             f.write(f"GOOGLE_CLIENT_SECRET=placeholder\n")
@@ -65,13 +104,20 @@ def check_or_create_frontend_env():
     if os.path.exists(frontend_dir):
         if not os.path.exists(env_path):
             with open(env_path, "w") as f:
-                f.write("VITE_API_URL=http://localhost:8080\n")
+                f.write("VITE_API_URL=http://localhost:8081\n")
                 f.write("VITE_IA_URL=http://localhost:5000\n")
                 f.write("VITE_GMAIL_URL=http://localhost:8082\n")
                 f.write("VITE_DOC_URL=http://localhost:9002\n")
                 f.write("VITE_EXCEL_URL=http://localhost:9004\n")
                 f.write("VITE_CODE_URL=http://localhost:9003\n")
                 f.write("VITE_MINI_MAPS_URL=http://localhost:9005\n")
+                f.write("VITE_DELIVERY_URL=\n")
+                f.write("VITE_RESERVATIONS_URL=\n")
+                f.write("VITE_TRANSPORT_URL=\n")
+                f.write("VITE_BROKER_URL=\n")
+                f.write("VITE_BANK_URL=\n")
+                f.write("VITE_TELEGRAM_URL=\n")
+                f.write("VITE_WHATSAPP_URL=\n")
             print(f"Created {env_path} with default values.")
         
         # Ensure ignored in root .gitignore
@@ -231,10 +277,18 @@ def open_secrets_manager():
             ("LinkedIn Secret", "LINKEDIN_CLIENT_SECRET", "*"),
             ("OpenRouter API Key", "OPENROUTER_API_KEY", "*"),
             ("OpenRouter Model", "OPENROUTER_MODEL", ""),
+            ("OpenRouter Site URL", "OPENROUTER_SITE_URL", ""),
+            ("OpenRouter App Name", "OPENROUTER_APP_NAME", ""),
+            ("CORS Allowed Origins", "CORS_ALLOWED_ORIGINS", ""),
+            ("CORS Allow Credentials", "CORS_ALLOW_CREDENTIALS", ""),
             ("HTTP Timeout Seconds", "HTTP_TIMEOUT_SECONDS", ""),
             ("Gmail Service URL", "GMAIL_SERVICE_URL", ""),
+            ("Token Vault URL", "TOKEN_VAULT_URL", ""),
             ("Doc Service URL", "DOC_SERVICE_URL", ""),
             ("Code Service URL", "CODE_SERVICE_URL", ""),
+            ("Code Exec Timeout Seconds", "CODE_EXEC_TIMEOUT_SECONDS", ""),
+            ("Code Max Chars", "CODE_MAX_CHARS", ""),
+            ("Code Max Output Chars", "CODE_MAX_OUTPUT_CHARS", ""),
             ("Code Service Max Memory (MB)", "CODE_MAX_MEMORY_MB", ""),
             ("Code Service Max STDIN Chars", "CODE_MAX_STDIN_CHARS", ""),
             ("Code Service Max SQL Rows", "CODE_MAX_SQL_RESULT_ROWS", ""),
@@ -248,6 +302,31 @@ def open_secrets_manager():
             ("Code Snippets DB Path", "CODE_SNIPPETS_DB_PATH", ""),
             ("Excel Service URL", "EXCEL_SERVICE_URL", ""),
             ("Mini Maps Service URL", "MINI_MAPS_SERVICE_URL", ""),
+            ("Delivery Enabled", "CONNECTOR_DELIVERY_ENABLED", ""),
+            ("Delivery API URL", "DELIVERY_API_URL", ""),
+            ("Delivery API Key", "DELIVERY_API_KEY", "*"),
+            ("WhatsApp Enabled", "CONNECTOR_WHATSAPP_ENABLED", ""),
+            ("WhatsApp Provider", "WHATSAPP_PROVIDER", ""),
+            ("WhatsApp API URL", "WHATSAPP_API_URL", ""),
+            ("WhatsApp Access Token", "WHATSAPP_ACCESS_TOKEN", "*"),
+            ("WhatsApp Phone Number ID", "WHATSAPP_PHONE_NUMBER_ID", ""),
+            ("Telegram Enabled", "CONNECTOR_TELEGRAM_ENABLED", ""),
+            ("Telegram Bot Token", "TELEGRAM_BOT_TOKEN", "*"),
+            ("Telegram API URL", "TELEGRAM_API_URL", ""),
+            ("Reservations Enabled", "CONNECTOR_RESERVATIONS_ENABLED", ""),
+            ("Reservations API URL", "RESERVATIONS_API_URL", ""),
+            ("Reservations API Key", "RESERVATIONS_API_KEY", "*"),
+            ("Transport Enabled", "CONNECTOR_TRANSPORT_ENABLED", ""),
+            ("Transport API URL", "PUBLIC_TRANSPORT_API_URL", ""),
+            ("Transport API Key", "PUBLIC_TRANSPORT_API_KEY", "*"),
+            ("Broker Enabled", "CONNECTOR_BROKER_ENABLED", ""),
+            ("Broker API URL", "BROKER_API_URL", ""),
+            ("Broker API Key", "BROKER_API_KEY", "*"),
+            ("Broker API Secret", "BROKER_API_SECRET", "*"),
+            ("Bank Enabled", "CONNECTOR_BANK_ENABLED", ""),
+            ("Bank API URL", "BANK_API_URL", ""),
+            ("Bank API Key", "BANK_API_KEY", "*"),
+            ("Bank API Secret", "BANK_API_SECRET", "*"),
             ("JWT Secret", "JWT_SECRET", "*")
         ], ".env"),
         ("Frontend / frontend/.env", [
@@ -257,7 +336,14 @@ def open_secrets_manager():
             ("VITE Doc Service URL", "VITE_DOC_URL", ""),
             ("VITE Excel Service URL", "VITE_EXCEL_URL", ""),
             ("VITE Code Service URL", "VITE_CODE_URL", ""),
-            ("VITE Mini Maps Service URL", "VITE_MINI_MAPS_URL", "")
+            ("VITE Mini Maps Service URL", "VITE_MINI_MAPS_URL", ""),
+            ("VITE Delivery URL", "VITE_DELIVERY_URL", ""),
+            ("VITE Reservations URL", "VITE_RESERVATIONS_URL", ""),
+            ("VITE Transport URL", "VITE_TRANSPORT_URL", ""),
+            ("VITE Broker URL", "VITE_BROKER_URL", ""),
+            ("VITE Bank URL", "VITE_BANK_URL", ""),
+            ("VITE Telegram URL", "VITE_TELEGRAM_URL", ""),
+            ("VITE WhatsApp URL", "VITE_WHATSAPP_URL", "")
         ], os.path.join("frontend", ".env")),
         ("IA Service / IA-service/.env", [
             ("OpenRouter API Key", "OPENROUTER_API_KEY", "*"),
@@ -297,6 +383,13 @@ def open_secrets_manager():
                     del updates[key] # Mark as processed
                     continue
             new_lines.append(line)
+
+        # Append new keys that were not present in file.
+        if updates:
+            if new_lines and not new_lines[-1].endswith("\n"):
+                new_lines.append("\n")
+            for key, value in updates.items():
+                new_lines.append(f"{key}={value}\n")
             
         with open(filename, 'w') as f:
             f.writelines(new_lines)
@@ -305,7 +398,7 @@ def open_secrets_manager():
         # Group updates by file
         updates_by_file = {}
         for key, (entry, file_path) in entries_map.items():
-            val =QH = entry.get().strip()
+            val = entry.get().strip()
             if val:
                 if file_path not in updates_by_file: updates_by_file[file_path] = {}
                 updates_by_file[file_path][key] = val
@@ -371,7 +464,7 @@ def create_gui():
     btn_open_front = tk.Button(frame, text="Open Frontend (Localhost)", command=lambda: open_url("http://localhost:5173"), width=25)
     btn_open_front.pack(pady=2)
 
-    btn_open_auth = tk.Button(frame, text="Open Auth API", command=lambda: open_url("http://localhost:8080"), width=25)
+    btn_open_auth = tk.Button(frame, text="Open Auth API", command=lambda: open_url("http://localhost:8081"), width=25)
     btn_open_auth.pack(pady=2)
 
     btn_open_ia = tk.Button(frame, text="Open IA Docs", command=lambda: open_url("http://localhost:5000/docs"), width=25)

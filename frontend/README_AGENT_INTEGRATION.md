@@ -12,8 +12,8 @@ This document summarizes the frontend changes made to restore real integration w
   - `getHistory`
   - `getTools`
 - Base URL resolution:
-  - `VITE_IA_SERVICE_URL` when present (recommended for local dev)
-  - fallback to `/ai` for dockerized nginx reverse proxy.
+  - `VITE_IA_URL` when present (recommended for local dev)
+  - fallback to `http://localhost:5000` in current frontend API config.
 - Optional JWT forwarding from `localStorage` (`Authorization: Bearer ...`).
 
 2. `src/pages/app/AgentPage.tsx`
@@ -46,7 +46,7 @@ Expected health endpoint for quick check:
 For local Vite dev (recommended):
 
 ```env
-VITE_IA_SERVICE_URL=http://localhost:8000
+VITE_IA_URL=http://localhost:5000
 ```
 
 For dockerized frontend behind nginx reverse proxy:
@@ -56,13 +56,13 @@ For dockerized frontend behind nginx reverse proxy:
 ## Verification Performed
 
 1. IA-service real runtime test:
-- `GET http://localhost:8000/` -> **200 OK**
-- `POST http://localhost:8000/agent/run` with sample task -> **200 OK** with generated response.
-- `GET http://localhost:8000/agent/tools` -> **200 OK** with tools list.
+- `GET http://localhost:5000/` -> **200 OK**
+- `POST http://localhost:5000/agent/run` with sample task -> **200 OK** with generated response.
+- `GET http://localhost:5000/agent/tools` -> **200 OK** with tools list.
 
 2. Build/tests:
 - Frontend build (`npm run build`) -> **PASS**
-- IA-service tests (`pytest tests/test_agent_routes.py -q`) -> **12 passed**
+- IA-service tests (`pytest tests/test_agent_routes.py -q`) -> **14 passed**
 
 ## Notes
 
