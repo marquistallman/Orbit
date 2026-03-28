@@ -7,10 +7,15 @@ Servicio de IA backend para el proyecto Orbit, construido con FastAPI. Proporcio
 - 🤖 **Agente de IA integrado**: Orquestación automática de tareas con selección inteligente de herramientas.
 - 🛠️ **Múltiples herramientas**: Generación de emails, análisis financiero, documentos, Excel, mini maps y ejecución de código mediante microservicios.
 - 🧠 **Memoria persistente por usuario**: Guarda preferencias e información contextual (por ejemplo idioma y personas relevantes) en SQLite.
+- 💸 **Control de costos por plan**: Plan `free` por defecto con límites mensuales de prompts/tokens y métricas de consumo por usuario.
 - 📝 **API tipada con Pydantic**: Validación automática de entrada/salida, documentación OpenAPI.
 - 🧪 **Tests unitarios**: 14+ tests con pytest + TestClient para validar contratos API.
 - 🔒 **Robustez de red**: Timeouts configurables, validación HTTP, manejo de errores resiliente.
 - 🐳 **Docker-ready**: Dockerfile optimizado y docker-compose con variables de entorno.
+
+## Documentación adicional
+
+- Perfiles de costos y planes (Free/Lite/Standard/Pro): [README_COST_PROFILES.md](README_COST_PROFILES.md)
 
 ## Requisitos
 
@@ -27,6 +32,8 @@ Servicio de IA backend para el proyecto Orbit, construido con FastAPI. Proporcio
    OPENROUTER_MODEL=openai/gpt-4o-mini
    HTTP_TIMEOUT_SECONDS=20
   MEMORY_DB_PATH=/data/agent_memory.db
+  USAGE_DB_PATH=/data/usage.db
+  DEFAULT_PLAN=free
    JWT_SECRET=your-secret-key-change-in-production
    ```
 
@@ -271,6 +278,12 @@ Lista la memoria persistida del usuario actual.
 
 #### DELETE `/agent/memory`
 Borra la memoria persistida del usuario actual.
+
+#### GET `/agent/plan`
+Devuelve el plan activo del usuario (por defecto `free`) y sus límites.
+
+#### GET `/agent/usage`
+Devuelve consumo mensual estimado por usuario (prompts, tokens de entrada/salida y costo aproximado).
 
 #### GET `/agent/status/{task_id}`
 Obtiene el estado de una tarea.

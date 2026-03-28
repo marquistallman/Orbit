@@ -187,6 +187,27 @@ class TestMemoryEndpoints:
         assert isinstance(data["deleted"], int)
 
 
+class TestUsageEndpoints:
+    """Tests for plan and usage endpoints."""
+
+    def test_plan_success(self):
+        response = client.get("/agent/plan")
+        assert response.status_code == 200
+        data = response.json()
+        assert "user_id" in data
+        assert "plan" in data
+        assert "name" in data["plan"]
+
+    def test_usage_success(self):
+        response = client.get("/agent/usage")
+        assert response.status_code == 200
+        data = response.json()
+        assert "user_id" in data
+        assert "plan_name" in data
+        assert "prompt_count" in data
+        assert "remaining" in data
+
+
 class TestHealthEndpoint:
     """Tests for GET / health endpoint."""
 
