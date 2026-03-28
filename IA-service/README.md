@@ -6,6 +6,7 @@ Servicio de IA backend para el proyecto Orbit, construido con FastAPI. Proporcio
 
 - 🤖 **Agente de IA integrado**: Orquestación automática de tareas con selección inteligente de herramientas.
 - 🛠️ **Múltiples herramientas**: Generación de emails, análisis financiero, documentos, Excel, mini maps y ejecución de código mediante microservicios.
+- 🧠 **Memoria persistente por usuario**: Guarda preferencias e información contextual (por ejemplo idioma y personas relevantes) en SQLite.
 - 📝 **API tipada con Pydantic**: Validación automática de entrada/salida, documentación OpenAPI.
 - 🧪 **Tests unitarios**: 14+ tests con pytest + TestClient para validar contratos API.
 - 🔒 **Robustez de red**: Timeouts configurables, validación HTTP, manejo de errores resiliente.
@@ -25,6 +26,7 @@ Servicio de IA backend para el proyecto Orbit, construido con FastAPI. Proporcio
    OPENROUTER_API_KEY=sk-or-v1-xxxx...
    OPENROUTER_MODEL=openai/gpt-4o-mini
    HTTP_TIMEOUT_SECONDS=20
+  MEMORY_DB_PATH=/data/agent_memory.db
    JWT_SECRET=your-secret-key-change-in-production
    ```
 
@@ -203,6 +205,10 @@ Ejecuta una tarea con el agente de IA.
 }
 ```
 
+Notas de memoria automática:
+- Si el usuario escribe instrucciones como "siempre háblame en español", el agente las recuerda para próximos mensajes.
+- Si menciona relaciones como "mi jefe Carlos" o compañeros de proyecto, se almacenan como contexto reutilizable.
+
 #### GET `/agent/tools`
 Lista todas las herramientas disponibles.
 
@@ -259,6 +265,12 @@ Ejecuta una herramienta directamente por ID.
   "payload": {"task": "analyze Q4 revenue"}
 }
 ```
+
+#### GET `/agent/memory`
+Lista la memoria persistida del usuario actual.
+
+#### DELETE `/agent/memory`
+Borra la memoria persistida del usuario actual.
 
 #### GET `/agent/status/{task_id}`
 Obtiene el estado de una tarea.

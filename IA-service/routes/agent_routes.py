@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 from agents.agent import Agent
 from agents.task_memory import get_task, get_history
+from ai.user_memory import resolve_user_id
 from tools.registry import get_tools
 from tools.tool_selector import select_tool
 from tools.tool_executor import execute_tool
@@ -84,6 +85,25 @@ class TaskHistoryResponse(BaseModel):
     tasks: list[TaskDetail]
 
 
+class MemoryItem(BaseModel):
+    memory_key: str
+    memory_type: str
+    memory_value: dict[str, Any]
+    source_text: str | None = None
+    created_at: str
+    updated_at: str
+
+
+class MemoryListResponse(BaseModel):
+    user_id: str
+    items: list[MemoryItem]
+
+
+class MemoryClearResponse(BaseModel):
+    user_id: str
+    deleted: int
+
+
 # -------------------------
 # RUN AGENT
 # -------------------------
@@ -91,7 +111,8 @@ class TaskHistoryResponse(BaseModel):
 @router.post("/agent/run", response_model=AgentRunResponse)
 def run_agent(data: AgentRunRequest, request: Request):
     token = request.headers.get("Authorization")
-    return agent.run(data.task, token=token)
+    user_id = request.headers.get("X-User-Id") or resolve_user_id(token)
+    return agent.run(data.task, token=token, user_id=user_id)
 
 
 # -------------------------
@@ -157,3 +178,18 @@ def get_status(task_id: str):
 @router.get("/agent/history", response_model=TaskHistoryResponse)
 def history():
     return {"tasks": get_history()}
+
+
+@router.get("/agent/memory", response_model=MemoryListResponse)
+def list_memory(request: Request):
+    token = request.headers.get("Authorization")
+    user_id = request.headers.get("X-User-Id") or resolve_user_id(token)
+    return {"user_id": user_id, "items": agent.memory_store.list_memory(user_id)}
+
+
+@router.delete("/agent/memory", response_model=MemoryClearResponse)
+def clear_memory(request: Request):
+    token = request.headers.get("Authorization")
+    user_id = request.headers.get("X-User-Id") or resolve_user_id(token)
+    deleted = agent.memory_store.clear_memory(user_id)
+    return {"user_id": user_id, "deleted": deleted}

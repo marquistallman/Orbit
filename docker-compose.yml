@@ -33,12 +33,15 @@ services:
       dockerfile: Dockerfile
     ports:
       - "5000:5000"
+    volumes:
+      - ./db/generated/ia-memory:/data
     # Load environment variables from the .env file
     env_file:
       - ./.env
       - ./.env.local
     environment:
       - PYTHONUNBUFFERED=1
+      - MEMORY_DB_PATH=${MEMORY_DB_PATH:-/data/agent_memory.db}
     networks:
       - orbit-network
     # Forzamos a FastAPI a escuchar en 0.0.0.0 para que sea accesible desde fuera

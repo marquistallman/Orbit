@@ -167,6 +167,26 @@ class TestTaskHistoryEndpoint:
         assert isinstance(data["tasks"], list)
 
 
+class TestMemoryEndpoints:
+    """Tests for GET/DELETE /agent/memory endpoint."""
+
+    def test_memory_list_success(self):
+        response = client.get("/agent/memory")
+        assert response.status_code == 200
+        data = response.json()
+        assert "user_id" in data
+        assert "items" in data
+        assert isinstance(data["items"], list)
+
+    def test_memory_clear_success(self):
+        response = client.delete("/agent/memory")
+        assert response.status_code == 200
+        data = response.json()
+        assert "user_id" in data
+        assert "deleted" in data
+        assert isinstance(data["deleted"], int)
+
+
 class TestHealthEndpoint:
     """Tests for GET / health endpoint."""
 

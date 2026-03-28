@@ -30,6 +30,7 @@ def check_or_create_env_file():
             f.write(f"CORS_ALLOWED_ORIGINS=http://localhost:5173\n")
             f.write(f"CORS_ALLOW_CREDENTIALS=true\n")
             f.write(f"HTTP_TIMEOUT_SECONDS=20\n")
+            f.write(f"MEMORY_DB_PATH=/data/agent_memory.db\n")
             f.write(f"GMAIL_SERVICE_URL=http://gmail-service:8082\n")
             f.write(f"TOKEN_VAULT_URL=http://auth-service:8080\n")
             f.write(f"DOC_SERVICE_URL=http://doc-service:9002\n")
@@ -282,6 +283,7 @@ def open_secrets_manager():
             ("CORS Allowed Origins", "CORS_ALLOWED_ORIGINS", ""),
             ("CORS Allow Credentials", "CORS_ALLOW_CREDENTIALS", ""),
             ("HTTP Timeout Seconds", "HTTP_TIMEOUT_SECONDS", ""),
+            ("Memory DB Path", "MEMORY_DB_PATH", ""),
             ("Gmail Service URL", "GMAIL_SERVICE_URL", ""),
             ("Token Vault URL", "TOKEN_VAULT_URL", ""),
             ("Doc Service URL", "DOC_SERVICE_URL", ""),
