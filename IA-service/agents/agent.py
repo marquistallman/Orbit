@@ -1,4 +1,7 @@
+import os
+
 from ai.model_client import call_model
+from ai.user_memory import UserMemoryStore, resolve_user_id
 from tools.tool_selector import select_tool
 from tools.tool_executor import execute_tool
 from agents.task_memory import create_task, finish_task
@@ -7,9 +10,15 @@ from utils.logger import logger
 
 class Agent:
 
-    def run(self, task: str, token: str = None):
+    def __init__(self):
+        default_db = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "agent_memory.db")
+        self.memory_store = UserMemoryStore(os.getenv("MEMORY_DB_PATH", default_db))
+
+    def run(self, task: str, token: str = None, user_id: str | None = None):
 
         logger.info(f"Agent received task: {task}")
+
+        resolved_user_id = user_id or resolve_user_id(token)
 
         task_id = create_task(task)
 
@@ -21,6 +30,10 @@ class Agent:
             # -------------------------
             # TOOL SELECTION
             # -------------------------
+            memory_updates = self.memory_store.extract_and_store(resolved_user_id, task)
+            if memory_updates:
+                logger.info(f"Memory updated for user={resolved_user_id}: {memory_updates}")
+
             tool_used = select_tool(task)
             logger.info(f"Tool selected: {tool_used}")
 
@@ -73,6 +86,21 @@ class Agent:
                     "content": system_prompt
                 }
             ]
+
+            memory_context = self.memory_store.build_system_context(resolved_user_id)
+            if memory_context:
+                messages.append({
+                    "role": "system",
+                    "content": memory_context
+                })
+
+            for item in self.memory_store.list_memory(resolved_user_id):
+                if item["memory_key"] == "preference:response_language" and item["memory_value"].get("language") == "es":
+                    messages.append({
+                        "role": "system",
+                        "content": "Always respond in Spanish unless the user explicitly asks another language."
+                    })
+                    break
 
             if tool_result:
                 messages.append({

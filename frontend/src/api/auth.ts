@@ -1,4 +1,4 @@
-const BASE_URL = 'http://localhost:8080'
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081'
 
 export interface User {
   id: string
@@ -23,7 +23,8 @@ export const loginRequest = async (email: string, password: string): Promise<Aut
     const err = await res.text()
     throw new Error(err || 'Credenciales inválidas')
   }
-  return res.json()
+  const data = await res.json()
+  return { token: data.token, user: data.user ?? data.userDto }
 }
 
 export const registerRequest = async (username: string, email: string, password: string): Promise<AuthResponse> => {
@@ -36,7 +37,8 @@ export const registerRequest = async (username: string, email: string, password:
     const err = await res.text()
     throw new Error(err || 'Error al crear cuenta')
   }
-  return res.json()
+  const data = await res.json()
+  return { token: data.token, user: data.user ?? data.userDto }
 }
 
 export const getMeRequest = async (): Promise<User> => {

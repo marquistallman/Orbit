@@ -12,12 +12,13 @@ services:
     # Load environment variables from the .env file
     env_file:
       - ./.env
+      - ./.env.local
   auth-service:
     build:
       context: ./auth-service
       dockerfile: Dockerfile
     ports:
-      - "8080:8080"
+      - "8081:8080"
     environment:
       - DB_HOST=postgres
     networks:
@@ -25,17 +26,22 @@ services:
     # Load environment variables from the .env file
     env_file:
       - ./.env
+      - ./.env.local
   ia-service:
     build:
       context: ./IA-service
       dockerfile: Dockerfile
     ports:
       - "5000:5000"
+    volumes:
+      - ./db/generated/ia-memory:/data
     # Load environment variables from the .env file
     env_file:
       - ./.env
+      - ./.env.local
     environment:
       - PYTHONUNBUFFERED=1
+      - MEMORY_DB_PATH=${MEMORY_DB_PATH:-/data/agent_memory.db}
     networks:
       - orbit-network
     # Forzamos a FastAPI a escuchar en 0.0.0.0 para que sea accesible desde fuera
@@ -52,10 +58,68 @@ services:
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
     env_file:
       - ./.env
+      - ./.env.local
     networks:
       - orbit-network
     depends_on:
       - postgres
+  doc-service:
+    build:
+      context: ./IA-service/service/doc-service
+      dockerfile: Dockerfile
+    ports:
+      - "9002:9002"
+    volumes:
+      - ./db/generated/docs:/data
+    environment:
+      - OUTPUT_DIR=/data
+    networks:
+      - orbit-network
+  excel-service:
+    build:
+      context: ./IA-service/service/excel-service
+      dockerfile: Dockerfile
+    ports:
+      - "9004:9004"
+    volumes:
+      - ./db/generated/excel:/data
+    environment:
+      - OUTPUT_DIR=/data
+    networks:
+      - orbit-network
+  code-service:
+    build:
+      context: ./IA-service/service/code-service
+      dockerfile: Dockerfile
+    ports:
+      - "9003:9003"
+    volumes:
+      - ./db/generated/code:/data
+    environment:
+      - CODE_EXEC_TIMEOUT_SECONDS=5
+      - CODE_MAX_MEMORY_MB=128
+      - CODE_MAX_CHARS=12000
+      - CODE_MAX_OUTPUT_CHARS=4000
+      - CODE_MAX_STDIN_CHARS=4000
+      - CODE_MAX_SQL_RESULT_ROWS=200
+      - CODE_MAX_SQL_STATEMENTS=30
+      - CODE_STRICT_MODE=true
+      - CODE_PYTHON_ALLOWED_IMPORTS=math,statistics,decimal,datetime,time,json,csv,sqlite3,collections,itertools,functools,fractions,random,re,typing,pathlib,openpyxl
+      - CODE_JS_ALLOWED_MODULES=
+      - CODE_PYTHON_BLOCK_PATTERNS=
+      - CODE_JS_BLOCK_PATTERNS=
+      - CODE_SQL_BLOCK_PATTERNS=
+      - CODE_SNIPPETS_DB_PATH=${CODE_SNIPPETS_DB_PATH:-/data/snippets.db}
+    networks:
+      - orbit-network
+  mini-maps-service:
+    build:
+      context: ./IA-service/service/mini-maps-service
+      dockerfile: Dockerfile
+    ports:
+      - "9005:9005"
+    networks:
+      - orbit-network
   frontend:
     build:
       context: ./frontend
