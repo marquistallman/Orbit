@@ -14,7 +14,7 @@ HTTP_TIMEOUT_SECONDS = float(os.getenv("HTTP_TIMEOUT_SECONDS", "20"))
 URL = "https://openrouter.ai/api/v1/chat/completions"
 
 
-def call_model(messages):
+def call_model(messages, model: str | None = None):
 
     if not OPENROUTER_API_KEY:
         logger.error("OPENROUTER_API_KEY is not configured")
@@ -36,7 +36,7 @@ def call_model(messages):
             URL,
             headers=headers,
             json={
-                "model": OPENROUTER_MODEL,
+                "model": model or OPENROUTER_MODEL,
                 "messages": messages
             },
             timeout=HTTP_TIMEOUT_SECONDS
