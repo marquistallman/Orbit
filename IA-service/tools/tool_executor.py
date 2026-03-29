@@ -1,6 +1,6 @@
 import requests
 import os
-from tools.registry import TOOLS
+from tools.registry import get_external_tools
 from tools.email_tool import generate_email
 from tools.finance_tool import analyze_finance
 from utils.logger import logger
@@ -10,6 +10,8 @@ HTTP_TIMEOUT_SECONDS = float(os.getenv("HTTP_TIMEOUT_SECONDS", "20"))
 
 
 def execute_tool(tool_id, payload, headers=None):
+
+    external_tools = get_external_tools()
 
     if payload is None:
         payload = {}
@@ -26,7 +28,7 @@ def execute_tool(tool_id, payload, headers=None):
     # -------------------------
     # 🔵 MICRO SERVICIOS
     # -------------------------
-    tool = TOOLS.get(tool_id)
+    tool = external_tools.get(tool_id)
 
     if not tool:
         logger.error(f"Tool not found: {tool_id}")

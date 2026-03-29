@@ -58,6 +58,27 @@ class TestListToolsEndpoint:
         assert "gmail_read" in data["tools"] or len(data["tools"]) >= 0
 
 
+class TestSelectToolEndpoint:
+    """Tests for POST /agent/select-tool endpoint."""
+
+    def test_select_tool_success(self):
+        response = client.post(
+            "/agent/select-tool",
+            json={"task": "write email to customer"}
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert "tool_id" in data
+        assert isinstance(data["tool_id"], str)
+
+    def test_select_tool_validation(self):
+        response = client.post(
+            "/agent/select-tool",
+            json={"task": ""}
+        )
+        assert response.status_code == 422
+
+
 class TestActionEndpoint:
     """Tests for POST /agent/action endpoint."""
 
@@ -144,6 +165,47 @@ class TestTaskHistoryEndpoint:
         data = response.json()
         assert "tasks" in data
         assert isinstance(data["tasks"], list)
+
+
+class TestMemoryEndpoints:
+    """Tests for GET/DELETE /agent/memory endpoint."""
+
+    def test_memory_list_success(self):
+        response = client.get("/agent/memory")
+        assert response.status_code == 200
+        data = response.json()
+        assert "user_id" in data
+        assert "items" in data
+        assert isinstance(data["items"], list)
+
+    def test_memory_clear_success(self):
+        response = client.delete("/agent/memory")
+        assert response.status_code == 200
+        data = response.json()
+        assert "user_id" in data
+        assert "deleted" in data
+        assert isinstance(data["deleted"], int)
+
+
+class TestUsageEndpoints:
+    """Tests for plan and usage endpoints."""
+
+    def test_plan_success(self):
+        response = client.get("/agent/plan")
+        assert response.status_code == 200
+        data = response.json()
+        assert "user_id" in data
+        assert "plan" in data
+        assert "name" in data["plan"]
+
+    def test_usage_success(self):
+        response = client.get("/agent/usage")
+        assert response.status_code == 200
+        data = response.json()
+        assert "user_id" in data
+        assert "plan_name" in data
+        assert "prompt_count" in data
+        assert "remaining" in data
 
 
 class TestHealthEndpoint:
