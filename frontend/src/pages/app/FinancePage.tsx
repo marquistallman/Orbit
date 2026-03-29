@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import DashCard from '../../components/ui/DashCard'
 import ExpenseSystem from '../../components/orbit/ExpenseSystem'
 import {
-  getSummary, getMonthly, getTransactions, getInvestments, getCategories,
-  type FinanceSummary, type Transaction, type Investment,
+  getSummary, getMonthly, getTransactions, getCategories,
+  type FinanceSummary, type Transaction,
   type MonthlyData, type ExpenseCategory,
 } from '../../api/finance'
 
@@ -188,34 +188,29 @@ export default function FinancePage() {
   const [summary,      setSummary]      = useState<FinanceSummary | null>(null)
   const [monthly,      setMonthly]      = useState<MonthlyData[]>([])
   const [transactions, setTransactions] = useState<Transaction[]>([])
-  const [investments,  setInvestments]  = useState<Investment[]>([])
   const [categories,   setCategories]   = useState<ExpenseCategory[]>([])
   const [period,       setPeriod]       = useState('1M')
   const [expanded,     setExpanded]     = useState(false)
-  const [expandedInv,  setExpandedInv]  = useState(false)
 
   const income     = useCountUp(summary?.income      ?? 0)
   const expenses   = useCountUp(summary?.expenses    ?? 0)
   const savings    = useCountUp(summary?.savings     ?? 0)
-  const invest_val = useCountUp(summary?.investments ?? 0)
 
   useEffect(() => {
     getSummary().then(setSummary)
     getMonthly().then(setMonthly)
     getTransactions().then(setTransactions)
-    getInvestments().then(setInvestments)
-    getCategories().then(setCategories)
+      getCategories().then(setCategories)
   }, [])
 
   const fmt = (n: number) => `$${n.toLocaleString()}`
 
   return (
-    <>
     <div style={{
       padding: '16px 24px',
       display: 'grid',
       gridTemplateColumns: '1fr 1fr',
-      gridTemplateRows: 'auto auto 1fr',
+      gridTemplateRows: 'auto auto auto',
       gap: 12,
       height: 'calc(100vh - 56px)',
       background: '#1a1a1a',
@@ -224,14 +219,13 @@ export default function FinancePage() {
     }}>
 
       {/* Metrics */}
-      <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10 }}>
+      <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
         {[
           { label: 'Income',      value: fmt(income),     sub: `+${summary?.incomeChange ?? 0}% this month`,   color: '#4a9a59' },
           { label: 'Expenses',    value: fmt(expenses),   sub: `+${summary?.expensesChange ?? 0}% this month`, color: '#9a4a4a' },
           { label: 'Savings',     value: fmt(savings),    sub: `${summary?.savingsRate ?? 0}% of income`,      color: '#C6A15B' },
-          { label: 'Investments', value: fmt(invest_val), sub: `+${summary?.investmentsReturn ?? 0}% return`,  color: '#C6A15B' },
         ].map(m => (
-          <DashCard key={m.label} style={{ padding: '10px 14px' }} speed={0.00025}>
+          <DashCard key={m.label} style={{ padding: '14px 20px' }} speed={0.00025}>
             <div style={{ fontSize: 9, color: '#8C6A3E', textTransform: 'uppercase' as const, letterSpacing: 1, marginBottom: 4 }}>{m.label}</div>
             <div style={{ fontSize: 20, fontWeight: 700, color: m.color, lineHeight: 1 }}>{m.value}</div>
             <div style={{ fontSize: 9, color: m.color, marginTop: 3, opacity: 0.8 }}>{m.sub}</div>
@@ -267,7 +261,7 @@ export default function FinancePage() {
       </DashCard>
 
       {/* Recent Transactions */}
-      <DashCard speed={0.0003} style={{ minHeight: 0, overflow: 'auto' }}>
+      <DashCard speed={0.0003} style={{ minHeight: 0, overflow: 'auto', gridColumn: '1 / -1' }}>
         <Label action="View all" onAction={() => setExpanded(true)}>Recent transactions</Label>
         {transactions.map((tx, i) => (
           <div key={tx.id} style={{
@@ -294,38 +288,7 @@ export default function FinancePage() {
         ))}
       </DashCard>
 
-      {/* Investments */}
-      <DashCard speed={0.0003} style={{ minHeight: 0, overflow: 'auto' }}>
-        <Label action="Manage" onAction={() => setExpandedInv(true)}>Investments</Label>
-        {investments.map(inv => (
-          <div key={inv.id} style={{
-            background: '#1B1B1B', border: '1px solid rgba(198,161,91,0.1)',
-            borderRadius: 6, padding: '8px 10px', marginBottom: 7,
-            display: 'flex', alignItems: 'center', gap: 10,
-          }}>
-            <div style={{ flex: 1, fontSize: 11, color: '#EDE6D6', fontWeight: 500 }}>{inv.name}</div>
-            <div style={{ fontSize: 11, color: '#EDE6D6' }}>{fmt(inv.value)}</div>
-            <div style={{
-              fontSize: 9, padding: '1px 6px', borderRadius: 10, flexShrink: 0,
-              background: inv.change >= 0 ? 'rgba(74,154,89,0.14)' : 'rgba(154,74,74,0.14)',
-              color:      inv.change >= 0 ? '#4a9a59' : '#9a4a4a',
-              border:     `1px solid ${inv.change >= 0 ? 'rgba(74,154,89,0.3)' : 'rgba(154,74,74,0.3)'}`,
-            }}>
-              {inv.change >= 0 ? '+' : ''}{inv.change}%
-            </div>
-            <div style={{ width: 55, height: 3, background: 'rgba(198,161,91,0.12)', borderRadius: 2, flexShrink: 0 }}>
-              <div style={{
-                width: `${inv.allocation}%`, height: '100%', borderRadius: 2,
-                background: inv.change >= 0 ? '#C6A15B' : '#9a4a4a',
-                transition: 'width 0.8s ease',
-              }} />
-            </div>
-          </div>
-        ))}
-      </DashCard>
-    </div>
-
-      {/* ── Expanded Transactions Overlay ── */}
+      {/* Expanded Transactions Overlay */}
       {expanded && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 100,
@@ -333,51 +296,41 @@ export default function FinancePage() {
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           backdropFilter: 'blur(3px)',
         }} onClick={() => setExpanded(false)}>
-          <div
-            onClick={e => e.stopPropagation()}
-            style={{
-              width: '72vw', maxHeight: '80vh',
-              background: '#1e1e1e',
-              border: '1px solid rgba(198,161,91,0.25)',
-              borderRadius: 10,
-              display: 'flex', flexDirection: 'column',
-              overflow: 'hidden',
-            }}
-          >
+          <div onClick={e => e.stopPropagation()} style={{
+            width: '72vw', maxHeight: '80vh',
+            background: '#1e1e1e',
+            border: '1px solid rgba(198,161,91,0.25)',
+            borderRadius: 10,
+            display: 'flex', flexDirection: 'column',
+            overflow: 'hidden',
+          }}>
             <div style={{
               padding: '16px 22px',
               borderBottom: '1px solid rgba(198,161,91,0.1)',
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               flexShrink: 0,
             }}>
-              <div style={{ fontSize: 10, color: '#8C6A3E', textTransform: 'uppercase' as const, letterSpacing: 2 }}>
-                Recent transactions
-              </div>
+              <div style={{ fontSize: 10, color: '#8C6A3E', textTransform: 'uppercase' as const, letterSpacing: 2 }}>Recent transactions</div>
               <button onClick={() => setExpanded(false)} style={{
                 background: 'none', border: '1px solid rgba(198,161,91,0.2)',
                 borderRadius: 5, color: '#8C6A3E', cursor: 'pointer',
-                fontFamily: 'inherit', fontSize: 11, padding: '4px 12px',
+                fontFamily: 'Questrial, sans-serif', fontSize: 11, padding: '4px 12px',
               }}>✕ Close</button>
             </div>
-
             <div style={{
-              display: 'grid',
-              gridTemplateColumns: '36px 1fr 140px 110px 100px',
+              display: 'grid', gridTemplateColumns: '36px 1fr 140px 110px 100px',
               gap: 12, padding: '10px 22px',
-              borderBottom: '1px solid rgba(198,161,91,0.08)',
-              flexShrink: 0,
+              borderBottom: '1px solid rgba(198,161,91,0.08)', flexShrink: 0,
             }}>
               {['', 'Description', 'Date', 'Category', 'Amount'].map(h => (
                 <div key={h} style={{ fontSize: 9, color: '#8C6A3E', textTransform: 'uppercase' as const, letterSpacing: 1.5 }}>{h}</div>
               ))}
             </div>
-
             <div style={{ overflowY: 'auto', flex: 1 }}>
               {transactions.map((tx, i) => (
                 <div key={tx.id}
                   style={{
-                    display: 'grid',
-                    gridTemplateColumns: '36px 1fr 140px 110px 100px',
+                    display: 'grid', gridTemplateColumns: '36px 1fr 140px 110px 100px',
                     gap: 12, padding: '13px 22px',
                     borderBottom: i < transactions.length - 1 ? '1px solid rgba(198,161,91,0.05)' : 'none',
                     alignItems: 'center',
@@ -394,7 +347,7 @@ export default function FinancePage() {
                   <div style={{ fontSize: 13, color: '#EDE6D6', fontWeight: 500 }}>{tx.name}</div>
                   <div style={{ fontSize: 11, color: '#8C6A3E' }}>{tx.date}</div>
                   <div style={{
-                    fontSize: 10, padding: '3px 9px', borderRadius: 10, display: 'inline-block',
+                    fontSize: 10, padding: '3px 9px', borderRadius: 10,
                     background: tx.type === 'income' ? 'rgba(74,154,89,0.1)' : 'rgba(154,74,74,0.1)',
                     color: tx.type === 'income' ? '#4a9a59' : '#9a4a4a',
                     border: `1px solid ${tx.type === 'income' ? 'rgba(74,154,89,0.25)' : 'rgba(154,74,74,0.25)'}`,
@@ -406,10 +359,8 @@ export default function FinancePage() {
                 </div>
               ))}
             </div>
-
             <div style={{
-              padding: '12px 22px',
-              borderTop: '1px solid rgba(198,161,91,0.1)',
+              padding: '12px 22px', borderTop: '1px solid rgba(198,161,91,0.1)',
               display: 'flex', gap: 28, flexShrink: 0,
             }}>
               {[
@@ -426,124 +377,6 @@ export default function FinancePage() {
           </div>
         </div>
       )}
-
-      {/* ── Expanded Investments Overlay ── */}
-      {expandedInv && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 100,
-          background: 'rgba(10,10,10,0.82)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          backdropFilter: 'blur(3px)',
-        }} onClick={() => setExpandedInv(false)}>
-          <div
-            onClick={e => e.stopPropagation()}
-            style={{
-              width: '68vw', maxHeight: '80vh',
-              background: '#1e1e1e',
-              border: '1px solid rgba(198,161,91,0.25)',
-              borderRadius: 10,
-              display: 'flex', flexDirection: 'column',
-              overflow: 'hidden',
-            }}
-          >
-            {/* Header */}
-            <div style={{
-              padding: '16px 22px',
-              borderBottom: '1px solid rgba(198,161,91,0.1)',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              flexShrink: 0,
-            }}>
-              <div style={{ fontSize: 10, color: '#8C6A3E', textTransform: 'uppercase' as const, letterSpacing: 2 }}>
-                Investments
-              </div>
-              <button onClick={() => setExpandedInv(false)} style={{
-                background: 'none', border: '1px solid rgba(198,161,91,0.2)',
-                borderRadius: 5, color: '#8C6A3E', cursor: 'pointer',
-                fontFamily: 'inherit', fontSize: 11, padding: '4px 12px',
-              }}>✕ Close</button>
-            </div>
-
-            {/* Column headers */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 110px 90px 90px 120px',
-              gap: 12, padding: '10px 22px',
-              borderBottom: '1px solid rgba(198,161,91,0.08)',
-              flexShrink: 0,
-            }}>
-              {['Asset', 'Value', 'Return', 'Allocation', 'Performance'].map(h => (
-                <div key={h} style={{ fontSize: 9, color: '#8C6A3E', textTransform: 'uppercase' as const, letterSpacing: 1.5 }}>{h}</div>
-              ))}
-            </div>
-
-            {/* Rows */}
-            <div style={{ overflowY: 'auto', flex: 1 }}>
-              {investments.map((inv, i) => (
-                <div key={inv.id}
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 110px 90px 90px 120px',
-                    gap: 12, padding: '16px 22px',
-                    borderBottom: i < investments.length - 1 ? '1px solid rgba(198,161,91,0.05)' : 'none',
-                    alignItems: 'center',
-                  }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(198,161,91,0.04)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                >
-                  {/* Name */}
-                  <div style={{ fontSize: 14, color: '#EDE6D6', fontWeight: 500 }}>{inv.name}</div>
-
-                  {/* Value */}
-                  <div style={{ fontSize: 14, color: '#EDE6D6' }}>{fmt(inv.value)}</div>
-
-                  {/* Return badge */}
-                  <div style={{
-                    fontSize: 11, padding: '4px 10px', borderRadius: 10, display: 'inline-block',
-                    background: inv.change >= 0 ? 'rgba(74,154,89,0.12)' : 'rgba(154,74,74,0.12)',
-                    color: inv.change >= 0 ? '#4a9a59' : '#9a4a4a',
-                    border: `1px solid ${inv.change >= 0 ? 'rgba(74,154,89,0.3)' : 'rgba(154,74,74,0.3)'}`,
-                    fontWeight: 600,
-                  }}>
-                    {inv.change >= 0 ? '+' : ''}{inv.change}%
-                  </div>
-
-                  {/* Allocation % */}
-                  <div style={{ fontSize: 13, color: '#8C6A3E' }}>{inv.allocation}%</div>
-
-                  {/* Progress bar */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div style={{ flex: 1, height: 4, background: 'rgba(198,161,91,0.1)', borderRadius: 2 }}>
-                      <div style={{
-                        width: `${inv.allocation}%`, height: '100%', borderRadius: 2,
-                        background: inv.change >= 0 ? '#C6A15B' : '#9a4a4a',
-                        transition: 'width 0.8s ease',
-                      }} />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Footer summary */}
-            <div style={{
-              padding: '14px 22px',
-              borderTop: '1px solid rgba(198,161,91,0.1)',
-              display: 'flex', gap: 32, flexShrink: 0,
-            }}>
-              {[
-                { label: 'Total invested', value: fmt(investments.reduce((s, i) => s + i.value, 0)), color: '#C6A15B' },
-                { label: 'Avg return',     value: `${(investments.reduce((s, i) => s + i.change, 0) / investments.length).toFixed(1)}%`, color: '#4a9a59' },
-                { label: 'Best asset',     value: investments.reduce((a, b) => a.change > b.change ? a : b).name, color: '#EDE6D6' },
-              ].map(s => (
-                <div key={s.label}>
-                  <div style={{ fontSize: 9, color: '#8C6A3E', textTransform: 'uppercase' as const, letterSpacing: 1, marginBottom: 3 }}>{s.label}</div>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: s.color }}>{s.value}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-    </>
+    </div>
   )
 }
