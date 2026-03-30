@@ -1,7 +1,10 @@
 import json
 import os
 import sqlite3
+import threading
+import time
 from datetime import datetime, timezone
+from collections import deque
 from typing import Any
 
 
@@ -212,3 +215,40 @@ def evaluate_limits(usage: dict[str, Any], plan: dict[str, Any]) -> dict[str, An
             "output_tokens": max(0, plan["monthly_output_tokens"] - usage["output_tokens"]),
         },
     }
+
+
+def usage_percentage(usage: dict[str, Any], plan: dict[str, Any]) -> float:
+    prompt_ratio = (usage["prompt_count"] / max(1, plan["monthly_prompts"])) if plan.get("monthly_prompts") else 0.0
+    input_ratio = (usage["input_tokens"] / max(1, plan["monthly_input_tokens"])) if plan.get("monthly_input_tokens") else 0.0
+    output_ratio = (usage["output_tokens"] / max(1, plan["monthly_output_tokens"])) if plan.get("monthly_output_tokens") else 0.0
+    return max(prompt_ratio, input_ratio, output_ratio)
+
+
+class RequestRateLimiter:
+    """Simple in-memory sliding-window rate limiter keyed by user and endpoint."""
+
+    def __init__(self):
+        self._events: dict[str, deque[float]] = {}
+        self._lock = threading.Lock()
+
+    def check(self, key: str, max_requests: int, window_seconds: int) -> dict[str, Any]:
+        now = time.time()
+        with self._lock:
+            q = self._events.setdefault(key, deque())
+            while q and now - q[0] > window_seconds:
+                q.popleft()
+
+            if len(q) >= max_requests:
+                retry_after = int(max(1, window_seconds - (now - q[0])))
+                return {
+                    "allowed": False,
+                    "retry_after_seconds": retry_after,
+                    "remaining": 0,
+                }
+
+            q.append(now)
+            return {
+                "allowed": True,
+                "retry_after_seconds": 0,
+                "remaining": max(0, max_requests - len(q)),
+            }

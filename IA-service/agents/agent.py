@@ -14,7 +14,15 @@ class Agent:
         default_db = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "agent_memory.db")
         self.memory_store = UserMemoryStore(os.getenv("MEMORY_DB_PATH", default_db))
 
-    def run(self, task: str, token: str = None, user_id: str | None = None):
+    def run(
+        self,
+        task: str,
+        token: str = None,
+        user_id: str | None = None,
+        model_override: str | None = None,
+        max_output_chars: int | None = None,
+        blocked_tools: set[str] | None = None,
+    ):
 
         logger.info(f"Agent received task: {task}")
 
@@ -36,6 +44,10 @@ class Agent:
 
             tool_used = select_tool(task)
             logger.info(f"Tool selected: {tool_used}")
+
+            if tool_used and blocked_tools and tool_used in blocked_tools:
+                logger.info(f"Tool {tool_used} skipped due to plan restriction")
+                tool_used = None
 
             # -------------------------
             # TOOL EXECUTION
@@ -118,7 +130,10 @@ class Agent:
             # -------------------------
             logger.info("Calling LLM")
 
-            response = call_model(messages)
+            response = call_model(messages, model=model_override)
+
+            if max_output_chars and isinstance(response, str) and len(response) > max_output_chars:
+                response = response[:max_output_chars].rstrip() + "\n\n[response_truncated_due_to_plan]"
 
             logger.info(f"LLM response: {response}")
 

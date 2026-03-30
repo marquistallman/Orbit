@@ -30,7 +30,23 @@ export interface AgentToolsResponse {
 // IA endpoints currently accept optional auth, but we forward JWT when available.
 const authHeaders = (): Record<string, string> => {
   const token = localStorage.getItem('token')
-  return token ? { Authorization: `Bearer ${token}` } : {}
+  const headers: Record<string, string> = {}
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+  // Also forward user ID for usage tracking
+  const authStore = localStorage.getItem('orbit-auth')
+  if (authStore) {
+    try {
+      const parsed = JSON.parse(authStore)
+      if (parsed.state?.user?.id) {
+        headers['X-User-Id'] = parsed.state.user.id
+      }
+    } catch {
+      // Silently fail if can't parse
+    }
+  }
+  return headers
 }
 
 export const runAgent = async (prompt: string): Promise<AgentRunResponse> => {
@@ -91,6 +107,58 @@ export const getTools = async (): Promise<AgentToolsResponse> => {
   if (!res.ok) {
     const body = await res.text().catch(() => '')
     throw new Error(`Error consultando herramientas (${res.status}): ${body || res.statusText}`)
+  }
+
+  return res.json()
+}
+
+export interface AgentPlanResponse {
+  user_id: string
+  plan: string
+  prompts_limit: number
+  tokens_limit: number
+  max_cost: number
+  created_at: string
+  updated_at: string
+}
+
+export interface AgentUsageResponse {
+  user_id: string
+  timestamp: string
+  prompts_used: number
+  tokens_used: number
+  cost_used: number
+  plan: string
+  prompts_limit: number
+  tokens_limit: number
+  max_cost: number
+}
+
+export const getAgentPlan = async (): Promise<AgentPlanResponse> => {
+  const res = await fetch(`${BASE_URL}/agent/plan`, {
+    headers: {
+      ...authHeaders(),
+    },
+  })
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new Error(`Error consultando plan (${res.status}): ${body || res.statusText}`)
+  }
+
+  return res.json()
+}
+
+export const getAgentUsage = async (): Promise<AgentUsageResponse> => {
+  const res = await fetch(`${BASE_URL}/agent/usage`, {
+    headers: {
+      ...authHeaders(),
+    },
+  })
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new Error(`Error consultando uso (${res.status}): ${body || res.statusText}`)
   }
 
   return res.json()
