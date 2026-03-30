@@ -114,24 +114,32 @@ export const getTools = async (): Promise<AgentToolsResponse> => {
 
 export interface AgentPlanResponse {
   user_id: string
-  plan: string
-  prompts_limit: number
-  tokens_limit: number
-  max_cost: number
-  created_at: string
-  updated_at: string
+  plan: {
+    name: 'free' | 'lite' | 'standard' | 'pro' | string
+    monthly_prompts: number
+    monthly_input_tokens: number
+    monthly_output_tokens: number
+    max_memory_items: number
+    memory_days: number
+    context_items: number
+    price_input_per_1k: number
+    price_output_per_1k: number
+  }
 }
 
 export interface AgentUsageResponse {
   user_id: string
-  timestamp: string
-  prompts_used: number
-  tokens_used: number
-  cost_used: number
-  plan: string
-  prompts_limit: number
-  tokens_limit: number
-  max_cost: number
+  plan_name: 'free' | 'lite' | 'standard' | 'pro' | string
+  month_key: string
+  prompt_count: number
+  input_tokens: number
+  output_tokens: number
+  estimated_cost_usd: number
+  remaining: {
+    prompts: number
+    input_tokens: number
+    output_tokens: number
+  }
 }
 
 export const getAgentPlan = async (): Promise<AgentPlanResponse> => {

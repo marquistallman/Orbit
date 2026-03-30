@@ -90,8 +90,15 @@ class PlanCatalog:
 class UsageStore:
     def __init__(self, db_path: str):
         _ensure_db_dir(db_path)
-        self.conn = sqlite3.connect(db_path, check_same_thread=False)
+        self.db_path = db_path
+        self.conn = sqlite3.connect(db_path, check_same_thread=False, timeout=30.0)
         self.conn.row_factory = sqlite3.Row
+        # Enable WAL mode for better concurrency and durability
+        self.conn.execute("PRAGMA journal_mode=WAL")
+        # Ensure fsync happens for data durability
+        self.conn.execute("PRAGMA synchronous=FULL")
+        # Set connection timeout for lock contention
+        self.conn.execute("PRAGMA busy_timeout=30000")
         self._create_tables()
 
     def _create_tables(self) -> None:
@@ -130,17 +137,24 @@ class UsageStore:
     def set_user_plan(self, user_id: str, plan_name: str) -> None:
         cur = self.conn.cursor()
         now = _utc_now()
-        cur.execute(
-            """
-            INSERT INTO user_plan (user_id, plan_name, updated_at)
-            VALUES (?, ?, ?)
-            ON CONFLICT(user_id) DO UPDATE SET
-                plan_name=excluded.plan_name,
-                updated_at=excluded.updated_at
-            """,
-            (user_id, plan_name, now),
-        )
-        self.conn.commit()
+        try:
+            cur.execute(
+                """
+                INSERT INTO user_plan (user_id, plan_name, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    plan_name=excluded.plan_name,
+                    updated_at=excluded.updated_at
+                """,
+                (user_id, plan_name, now),
+            )
+            self.conn.commit()
+            # Force checkpoint for WAL persistence
+            self.conn.execute("PRAGMA wal_checkpoint(RESTART)")
+        except sqlite3.Error as e:
+            print(f"ERROR: Failed to set plan for {user_id}: {e}")
+            self.conn.rollback()
+            raise
 
     def get_month_usage(self, user_id: str, month_key: str | None = None) -> dict[str, Any]:
         mk = month_key or _month_key()
@@ -178,20 +192,27 @@ class UsageStore:
         mk = _month_key()
         now = _utc_now()
         cur = self.conn.cursor()
-        cur.execute(
-            """
-            INSERT INTO usage_monthly (user_id, month_key, prompt_count, input_tokens, output_tokens, estimated_cost_usd, updated_at)
-            VALUES (?, ?, 1, ?, ?, ?, ?)
-            ON CONFLICT(user_id, month_key) DO UPDATE SET
-                prompt_count=prompt_count + 1,
-                input_tokens=input_tokens + excluded.input_tokens,
-                output_tokens=output_tokens + excluded.output_tokens,
-                estimated_cost_usd=estimated_cost_usd + excluded.estimated_cost_usd,
-                updated_at=excluded.updated_at
-            """,
-            (user_id, mk, input_tokens, output_tokens, cost_usd, now),
-        )
-        self.conn.commit()
+        try:
+            cur.execute(
+                """
+                INSERT INTO usage_monthly (user_id, month_key, prompt_count, input_tokens, output_tokens, estimated_cost_usd, updated_at)
+                VALUES (?, ?, 1, ?, ?, ?, ?)
+                ON CONFLICT(user_id, month_key) DO UPDATE SET
+                    prompt_count=prompt_count + 1,
+                    input_tokens=input_tokens + excluded.input_tokens,
+                    output_tokens=output_tokens + excluded.output_tokens,
+                    estimated_cost_usd=estimated_cost_usd + excluded.estimated_cost_usd,
+                    updated_at=excluded.updated_at
+                """,
+                (user_id, mk, input_tokens, output_tokens, cost_usd, now),
+            )
+            self.conn.commit()
+            # Force checkpoint for WAL persistence
+            self.conn.execute("PRAGMA wal_checkpoint(RESTART)")
+        except sqlite3.Error as e:
+            print(f"ERROR: Failed to add usage for {user_id}: {e}")
+            self.conn.rollback()
+            raise
         return self.get_month_usage(user_id, mk)
 
 

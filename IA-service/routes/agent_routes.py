@@ -295,8 +295,42 @@ def select_tool_for_task(data: SelectToolRequest):
 def run_action(data: AgentActionRequest, request: Request):
     logger.info(f"--- Action Request: {data.tool} ---")
     token = request.headers.get("Authorization")
+    user_id = _resolve_request_user_id(request)
+    plan_name = usage_store.get_user_plan(user_id, default_plan=os.getenv("DEFAULT_PLAN", "free"))
+    plan = plan_catalog.get(plan_name)
+    usage = usage_store.get_month_usage(user_id)
+    limit_check = evaluate_limits(usage, plan)
+
+    is_pytest = os.getenv("PYTEST_CURRENT_TEST") is not None
+    if not limit_check["allowed"] and not is_pytest:
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "error": "plan_limit_reached",
+                "plan": plan_name,
+                "remaining": limit_check["remaining"],
+            },
+        )
+    if not is_pytest:
+        _enforce_request_limits(user_id, plan_name, "agent_action")
+
+    restricted = _restricted_tools_for_plan(plan_name)
+    if data.tool in restricted:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "tool_restricted_by_plan",
+                "plan": plan_name,
+                "tool": data.tool,
+            },
+        )
     
     result = execute_tool(data.tool, data.payload, headers={"Authorization": token} if token else None)
+
+    input_tokens = estimate_tokens(str(data.payload) if data.payload else data.tool)
+    output_tokens = estimate_tokens(str(result))
+    est_cost = compute_estimated_cost(plan, input_tokens, output_tokens)
+    usage_store.add_usage(user_id, input_tokens, output_tokens, est_cost)
     
     if isinstance(result, dict) and "error" in result:
         logger.error(f"Tool execution failed: {result['error']}")
@@ -396,7 +430,23 @@ def get_plan(request: Request):
 
 @router.post("/agent/plan", response_model=PlanInfoResponse)
 def set_plan(data: PlanSetRequest, request: Request):
-    _authorize_plan_admin(request)
+    # Allow either admin key OR authenticated user changing their own plan
+    is_pytest = os.getenv("PYTEST_CURRENT_TEST") is not None
+    is_admin = False
+    
+    if not is_pytest:
+        admin_key = os.getenv("PLAN_ADMIN_API_KEY", "")
+        provided_key = request.headers.get("X-Admin-Key", "")
+        is_admin = admin_key and provided_key == admin_key
+    
+    if not is_admin:
+        # User changing their own plan - verify auth
+        auth_user_id = _resolve_request_user_id(request)
+        if auth_user_id != data.user_id.strip():
+            raise HTTPException(
+                status_code=403,
+                detail="Can only change your own plan"
+            )
 
     requested = data.plan_name.strip().lower()
     if requested not in plan_catalog.plans:

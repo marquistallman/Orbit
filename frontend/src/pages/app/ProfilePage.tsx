@@ -127,12 +127,13 @@ export default function ProfilePage() {
     return 0
   }
 
-  const promptsUsed = toSafeNumber(usage?.prompts_used)
-  const promptsLimit = toSafeNumber(plan?.prompts_limit)
-  const tokensUsed = toSafeNumber(usage?.tokens_used)
-  const tokensLimit = toSafeNumber(plan?.tokens_limit)
-  const costUsed = toSafeNumber(usage?.cost_used)
-  const maxCost = toSafeNumber(plan?.max_cost)
+  const promptsUsed = toSafeNumber(usage?.prompt_count)
+  const promptsLimit = toSafeNumber(plan?.plan?.monthly_prompts)
+  const inputTokensUsed = toSafeNumber(usage?.input_tokens)
+  const inputTokensLimit = toSafeNumber(plan?.plan?.monthly_input_tokens)
+  const outputTokensUsed = toSafeNumber(usage?.output_tokens)
+  const outputTokensLimit = toSafeNumber(plan?.plan?.monthly_output_tokens)
+  const costUsed = toSafeNumber(usage?.estimated_cost_usd)
 
   const toPercent = (used: number, limit: number) => {
     if (limit <= 0) return 0
@@ -141,8 +142,8 @@ export default function ProfilePage() {
 
   // Calculate usage percentages
   const promptsPercent = toPercent(promptsUsed, promptsLimit)
-  const tokensPercent = toPercent(tokensUsed, tokensLimit)
-  const costPercent = toPercent(costUsed, maxCost)
+  const inputTokensPercent = toPercent(inputTokensUsed, inputTokensLimit)
+  const outputTokensPercent = toPercent(outputTokensUsed, outputTokensLimit)
 
   // ── View mode ──────────────────────────────────────────────
   return (
@@ -190,7 +191,7 @@ export default function ProfilePage() {
           <Field label="Email"     value={form.email} />
           <Field label="Timezone"  value={form.timezone} />
           <Field label="Language"  value={form.language} />
-          <Field label="Plan"      value={usage?.plan || (loadingPlan ? 'Loading...' : 'Free')} />
+          <Field label="Plan"      value={usage?.plan_name || (loadingPlan ? 'Loading...' : 'free')} />
         </DashCard>
 
         {/* Plan & Usage */}
@@ -249,11 +250,11 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              {/* Tokens */}
+              {/* Input tokens */}
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 11 }}>
-                  <span style={{ color: '#8C6A3E' }}>Tokens</span>
-                  <span style={{ color: '#C6A15B' }}>{tokensUsed} / {tokensLimit}</span>
+                  <span style={{ color: '#8C6A3E' }}>Input tokens</span>
+                  <span style={{ color: '#C6A15B' }}>{inputTokensUsed} / {inputTokensLimit}</span>
                 </div>
                 <div style={{
                   width: '100%', height: 6, background: 'rgba(198,161,91,0.1)',
@@ -261,28 +262,30 @@ export default function ProfilePage() {
                 }}>
                   <div style={{
                     height: '100%', background: 'linear-gradient(90deg, #C6A15B, #A67C52)',
-                    width: `${tokensPercent}%`, transition: 'width 0.3s ease',
+                    width: `${inputTokensPercent}%`, transition: 'width 0.3s ease',
                   }} />
                 </div>
               </div>
 
-              {/* Cost */}
+              {/* Output tokens */}
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 11 }}>
-                  <span style={{ color: '#8C6A3E' }}>Cost</span>
-                  <span style={{ color: '#C6A15B' }}>${costUsed.toFixed(2)} / ${maxCost.toFixed(2)}</span>
+                  <span style={{ color: '#8C6A3E' }}>Output tokens</span>
+                  <span style={{ color: '#C6A15B' }}>{outputTokensUsed} / {outputTokensLimit}</span>
                 </div>
                 <div style={{
                   width: '100%', height: 6, background: 'rgba(198,161,91,0.1)',
                   borderRadius: 3, overflow: 'hidden',
                 }}>
                   <div style={{
-                    height: '100%', background: costPercent > 80 
-                      ? 'linear-gradient(90deg, #9a4a4a, #6b3131)' 
-                      : 'linear-gradient(90deg, #C6A15B, #A67C52)',
-                    width: `${costPercent}%`, transition: 'width 0.3s ease',
+                    height: '100%', background: 'linear-gradient(90deg, #C6A15B, #A67C52)',
+                    width: `${outputTokensPercent}%`, transition: 'width 0.3s ease',
                   }} />
                 </div>
+              </div>
+
+              <div style={{ fontSize: 11, color: '#8C6A3E' }}>
+                Estimated monthly cost: <span style={{ color: '#C6A15B' }}>${costUsed.toFixed(4)}</span>
               </div>
             </div>
           ) : null}

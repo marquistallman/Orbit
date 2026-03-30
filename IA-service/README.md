@@ -443,9 +443,12 @@ CODE_SQL_BLOCK_PATTERNS=
 - Puerto por defecto: `9003`.
 
 ### mini-maps-service
-- `POST /map`: genera mini mapa `9x9` con puntos (x, y) y crea salida interactiva HTML.
-- Devuelve `map_lines` (ASCII grid), `legend` y archivo `interactive_map_file`.
-- `GET /files/{file_name}`: descarga/abre el mapa HTML generado.
+- `GET /`: UI interactiva con Leaflet para crear marcadores circulares.
+- `GET /api/points`: lista puntos persistidos por `user_id`.
+- `POST /api/points`: crea marcador con `name`, `lat`, `lng`, `color`, `radius`.
+- `PUT /api/points/{point_id}`: edita nombre, color y radio.
+- `DELETE /api/points/{point_id}`: elimina marcador.
+- `POST /map`: endpoint legado compatible con integración por coordenadas `x,y`.
 - Puerto por defecto: `9005`.
 
 ### Integración frontend
@@ -465,9 +468,9 @@ CODE_SQL_BLOCK_PATTERNS=
 - ✅ Editar documentos existentes vía `POST /apply-changes` para cambios enviados por IA.
 
 ### #38 Mini Maps
-- ✅ Microservicio dedicado con entrada por coordenadas.
-- ✅ Salida de mapa estructurado + mapa interactivo HTML.
-- ✅ Exposición por API para consumo desde frontend o agente.
+- ✅ Microservicio dedicado con mapa interactivo y marcadores editables.
+- ✅ Persistencia de puntos por usuario (`user_id`).
+- ✅ Exposición por API para consumo desde frontend o agente (incluye endpoint legado).
 
 ### #39 Pequeño editor de código
 - ✅ Microservicio independiente con baja interacción con otros servicios.
