@@ -48,6 +48,8 @@ public class SecurityConfig {
                 .requestMatchers(
                     "/", 
                     "/index.html", 
+                    "/actuator/health",
+                    "/actuator/prometheus",
                     "/api/auth/login", 
                     "/api/auth/register", 
                     "/api/auth/recover/**",

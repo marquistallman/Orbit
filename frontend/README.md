@@ -61,6 +61,14 @@ Open `http://localhost:5173`
 
 ## Implemented features
 
+### Backend Security/Observability Impact
+
+Recent backend hardening updates (distributed rate limit, adaptive cooldowns, Prometheus metrics) do not require mandatory frontend code changes.
+
+- Existing frontend API flows remain valid.
+- No auth UX behavior was changed by these monitoring/security updates.
+- Optional improvement: read `X-RateLimit-*` headers to provide user feedback before receiving `429` responses.
+
 ### Authentication
 - **Login** — form with validation, calls `POST /api/auth/login`
 - **Register** — form with validation, calls `POST /api/auth/register`

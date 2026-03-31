@@ -43,10 +43,28 @@ services:
       - PYTHONUNBUFFERED=1
       - MEMORY_DB_PATH=${MEMORY_DB_PATH:-/data/agent_memory.db}
       - USAGE_DB_PATH=${USAGE_DB_PATH:-/data/usage.db}
+      - RATE_LIMIT_BACKEND=${RATE_LIMIT_BACKEND:-redis}
+      - RATE_LIMIT_REDIS_URL=${RATE_LIMIT_REDIS_URL:-redis://redis:6379/0}
+      - RATE_LIMIT_REDIS_PREFIX=${RATE_LIMIT_REDIS_PREFIX:-orbit}
+      - RATE_LIMIT_MULTIPLIER_AGENT_RUN=${RATE_LIMIT_MULTIPLIER_AGENT_RUN:-1.0}
+      - RATE_LIMIT_MULTIPLIER_AGENT_ACTION=${RATE_LIMIT_MULTIPLIER_AGENT_ACTION:-0.7}
+      - RATE_LIMIT_MULTIPLIER_AGENT_TOOL=${RATE_LIMIT_MULTIPLIER_AGENT_TOOL:-0.6}
     networks:
       - orbit-network
+    depends_on:
+      - redis
     # Forzamos a FastAPI a escuchar en 0.0.0.0 para que sea accesible desde fuera
     command: uvicorn main:app --host 0.0.0.0 --port 5000
+  redis:
+    image: redis:7-alpine
+    container_name: orbit-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    networks:
+      - orbit-network
   gmail-service:
     build:
       context: ./gmail-service
@@ -152,6 +170,7 @@ services:
     container_name: orbit-prometheus
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus-alerts.yml:/etc/prometheus/alerts.yml
     ports:
       - "9090:9090"
     networks:
@@ -170,3 +189,6 @@ services:
 networks:
   orbit-network:
     driver: bridge
+
+volumes:
+  redis-data:

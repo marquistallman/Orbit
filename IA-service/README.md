@@ -13,6 +13,46 @@ Servicio de IA backend para el proyecto Orbit, construido con FastAPI. Proporcio
 - 🔒 **Robustez de red**: Timeouts configurables, validación HTTP, manejo de errores resiliente.
 - 🐳 **Docker-ready**: Dockerfile optimizado y docker-compose con variables de entorno.
 
+## Novedades de seguridad y observabilidad (Fase 2/3)
+
+- **Rate limit distribuido** con backend Redis (fallback automatico a memoria si Redis no esta disponible).
+- **Endurecimiento adaptativo**: al detectar abuso repetido, reduce temporalmente el limite efectivo y aplica cooldown progresivo.
+- **Headers de control** en respuestas de endpoints protegidos:
+  - `X-RateLimit-Limit`
+  - `X-RateLimit-Limit-Base`
+  - `X-RateLimit-Remaining`
+  - `X-RateLimit-Reset`
+  - `X-RateLimit-Adaptive`
+  - `Retry-After` (cuando retorna `429`).
+- **Validacion estricta de entrada** en payloads y user identifiers.
+- **Metricas Prometheus reales** expuestas en `GET /metrics` (formato OpenMetrics), incluyendo:
+  - `orbit_rate_limit_checks_total`
+  - `orbit_rate_limit_throttles_total`
+  - `orbit_rate_limit_retry_after_seconds`
+  - `orbit_rate_limit_effective_limit`
+  - `orbit_rate_limit_adaptive_tightening`
+  - `orbit_rate_limit_adaptive_tightening_events_total`
+- **Logging estructurado de seguridad** para eventos de bloqueo y adaptacion.
+
+## Variables de entorno recomendadas (rate limit y metricas)
+
+Adicionales a las variables base ya existentes:
+
+```
+RATE_LIMIT_BACKEND=redis
+RATE_LIMIT_REDIS_URL=redis://redis:6379/0
+RATE_LIMIT_REDIS_PREFIX=orbit
+RATE_LIMIT_MULTIPLIER_AGENT_RUN=1.0
+RATE_LIMIT_MULTIPLIER_AGENT_ACTION=0.7
+RATE_LIMIT_MULTIPLIER_AGENT_TOOL=0.6
+SECURITY_METRICS_ENABLED=true
+```
+
+Notas:
+
+- Si `RATE_LIMIT_BACKEND=redis` y Redis no responde, el servicio cae de forma segura a limiter en memoria.
+- En despliegues con varias replicas, se recomienda Redis para consistencia entre instancias.
+
 ## Documentación adicional
 
 - Perfiles de costos y planes (Free/Lite/Standard/Pro): [README_COST_PROFILES.md](README_COST_PROFILES.md)
@@ -321,6 +361,9 @@ Health check del servicio.
   "status": "IA-service is running"
 }
 ```
+
+#### GET `/metrics`
+Expone metricas Prometheus para observabilidad y alertas.
 
 ## Estructura del proyecto
 

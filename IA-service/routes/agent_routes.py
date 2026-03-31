@@ -1,25 +1,36 @@
 import os
+import json
+import re
 from typing import Any
 from datetime import datetime
 from enum import Enum
-from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, HTTPException, Request, Response
+from pydantic import BaseModel, Field, ConfigDict
 
 from agents.agent import Agent
 from agents.task_memory import get_task, get_history
+from ai.security_observability import observe_rate_limit
 from ai.user_memory import resolve_user_id
-from ai.usage_meter import PlanCatalog, RequestRateLimiter, UsageStore, compute_estimated_cost, estimate_tokens, evaluate_limits, usage_percentage
+from ai.usage_meter import PlanCatalog, UsageStore, compute_estimated_cost, create_rate_limiter, estimate_tokens, evaluate_limits, usage_percentage
 from tools.registry import get_tools
 from tools.tool_selector import select_tool
 from tools.tool_executor import execute_tool
-from utils.logger import logger
+from utils.logger import log_security_event, logger
 
 router = APIRouter()
 
 agent = Agent()
 plan_catalog = PlanCatalog()
 usage_store = UsageStore(os.getenv("USAGE_DB_PATH", os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "usage.db")))
-rate_limiter = RequestRateLimiter()
+rate_limiter = create_rate_limiter()
+
+MAX_USER_ID_LEN = int(os.getenv("MAX_USER_ID_LEN", "120"))
+MAX_TASK_CHARS = int(os.getenv("MAX_TASK_CHARS", "12000"))
+MAX_TOOL_ID_LEN = int(os.getenv("MAX_TOOL_ID_LEN", "64"))
+MAX_PLAN_NAME_LEN = int(os.getenv("MAX_PLAN_NAME_LEN", "32"))
+MAX_PAYLOAD_CHARS = int(os.getenv("MAX_PAYLOAD_CHARS", "12000"))
+MAX_PAYLOAD_KEYS = int(os.getenv("MAX_PAYLOAD_KEYS", "100"))
+ALLOWED_ID_RE = re.compile(r"^[a-zA-Z0-9_.:@-]+$")
 
 
 def _default_rate_limit_for_plan(plan_name: str) -> int:
@@ -31,6 +42,18 @@ def _default_rate_limit_for_plan(plan_name: str) -> int:
         "pro": 240,
     }
     return int(os.getenv(env_key, str(default_map.get(plan_name, 30))))
+
+
+def _endpoint_rate_per_min(plan_name: str, endpoint_key: str) -> int:
+    base = _default_rate_limit_for_plan(plan_name)
+    default_multipliers = {
+        "agent_run": 1.0,
+        "agent_action": 0.7,
+        "agent_tool": 0.6,
+    }
+    env_key = f"RATE_LIMIT_MULTIPLIER_{endpoint_key.upper()}"
+    multiplier = float(os.getenv(env_key, str(default_multipliers.get(endpoint_key, 1.0))))
+    return max(1, int(base * max(0.1, multiplier)))
 
 
 def _restricted_tools_for_plan(plan_name: str) -> set[str]:
@@ -64,16 +87,75 @@ def _maybe_degradation_policy(plan_name: str, usage: dict[str, Any], plan: dict[
     return policy
 
 
-def _enforce_request_limits(user_id: str, plan_name: str, endpoint_key: str) -> None:
-    max_per_min = _default_rate_limit_for_plan(plan_name)
-    check = rate_limiter.check(f"{user_id}:{endpoint_key}", max_requests=max_per_min, window_seconds=60)
+def _enforce_request_limits(request: Request, response: Response, user_id: str, plan_name: str, endpoint_key: str) -> None:
+    max_per_min = _endpoint_rate_per_min(plan_name, endpoint_key)
+    client_ip = (request.client.host if request.client else "unknown").strip() or "unknown"
+    limiter_key = f"{user_id}:{client_ip}:{endpoint_key}"
+    check = rate_limiter.check(limiter_key, max_requests=max_per_min, window_seconds=60)
+    effective_limit = int(check.get("effective_limit", check.get("limit", max_per_min)))
+    adaptive_tightening = bool(check.get("adaptive_tightening", False))
+    violations = int(check.get("violations", 0))
+    reset_seconds = int(check.get("window_seconds", 60))
+    reason = check.get("reason")
+
+    # Surface standard headers so clients can self-throttle proactively.
+    response.headers["X-RateLimit-Limit"] = str(effective_limit)
+    response.headers["X-RateLimit-Limit-Base"] = str(max_per_min)
+    response.headers["X-RateLimit-Remaining"] = str(check.get("remaining", 0))
+    response.headers["X-RateLimit-Reset"] = str(reset_seconds)
+    response.headers["X-RateLimit-Adaptive"] = "true" if adaptive_tightening else "false"
+
+    observe_rate_limit(
+        endpoint=endpoint_key,
+        plan=plan_name,
+        allowed=bool(check.get("allowed", False)),
+        reason=reason,
+        effective_limit=effective_limit,
+        adaptive_tightening=adaptive_tightening,
+        retry_after_seconds=int(check.get("retry_after_seconds", 0)),
+    )
+
     if not check["allowed"]:
+        retry_after = int(check.get("retry_after_seconds", 1))
+        log_security_event(
+            "rate_limit_blocked",
+            user_id=user_id,
+            client_ip=client_ip,
+            endpoint=endpoint_key,
+            plan=plan_name,
+            reason=reason,
+            retry_after_seconds=retry_after,
+            base_limit=max_per_min,
+            effective_limit=effective_limit,
+            violations=violations,
+        )
         raise HTTPException(
             status_code=429,
             detail={
                 "error": "rate_limit_reached",
-                "retry_after_seconds": check["retry_after_seconds"],
+                "retry_after_seconds": retry_after,
+                "reason": reason,
             },
+            headers={
+                "Retry-After": str(retry_after),
+                "X-RateLimit-Limit": str(effective_limit),
+                "X-RateLimit-Limit-Base": str(max_per_min),
+                "X-RateLimit-Remaining": "0",
+                "X-RateLimit-Reset": str(retry_after),
+                "X-RateLimit-Adaptive": "true" if adaptive_tightening else "false",
+            },
+        )
+
+    if adaptive_tightening:
+        log_security_event(
+            "rate_limit_adaptive_active",
+            user_id=user_id,
+            client_ip=client_ip,
+            endpoint=endpoint_key,
+            plan=plan_name,
+            base_limit=max_per_min,
+            effective_limit=effective_limit,
+            violations=violations,
         )
 
 
@@ -85,7 +167,24 @@ def _as_bool(value: str | None, default: bool = False) -> bool:
 
 def _resolve_request_user_id(request: Request) -> str:
     token = request.headers.get("Authorization")
-    user_id = request.headers.get("X-User-Id") or resolve_user_id(token)
+    raw_user_id = request.headers.get("X-User-Id") or resolve_user_id(token)
+    user_id = (raw_user_id or "anonymous").strip()
+    if len(user_id) > MAX_USER_ID_LEN:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_user_id",
+                "message": f"user_id exceeds {MAX_USER_ID_LEN} characters",
+            },
+        )
+    if user_id != "anonymous" and not ALLOWED_ID_RE.match(user_id):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_user_id",
+                "message": "user_id contains unsupported characters",
+            },
+        )
     allow_anonymous = _as_bool(os.getenv("ALLOW_ANONYMOUS_USER", "true"), default=True)
     if not allow_anonymous and user_id == "anonymous":
         raise HTTPException(
@@ -116,22 +215,59 @@ def _authorize_plan_admin(request: Request) -> None:
         )
 
 
+def _validate_payload(payload: dict[str, Any], *, source: str) -> None:
+    if len(payload) > MAX_PAYLOAD_KEYS:
+        raise HTTPException(
+            status_code=413,
+            detail={
+                "error": "payload_too_large",
+                "message": f"{source} payload has too many keys (max {MAX_PAYLOAD_KEYS})",
+            },
+        )
+    try:
+        payload_chars = len(json.dumps(payload, ensure_ascii=True, separators=(",", ":")))
+    except (TypeError, ValueError):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_payload",
+                "message": f"{source} payload must be JSON-serializable",
+            },
+        )
+    if payload_chars > MAX_PAYLOAD_CHARS:
+        raise HTTPException(
+            status_code=413,
+            detail={
+                "error": "payload_too_large",
+                "message": f"{source} payload exceeds {MAX_PAYLOAD_CHARS} characters",
+            },
+        )
+
+
 class AgentRunRequest(BaseModel):
-    task: str = Field(..., min_length=1)
+    model_config = ConfigDict(extra="forbid")
+
+    task: str = Field(..., min_length=1, max_length=MAX_TASK_CHARS)
 
 
 class AgentActionRequest(BaseModel):
-    tool: str = Field(..., min_length=1)
+    model_config = ConfigDict(extra="forbid")
+
+    tool: str = Field(..., min_length=1, max_length=MAX_TOOL_ID_LEN, pattern=r"^[a-zA-Z0-9_:-]+$")
     payload: dict[str, Any] = Field(default_factory=dict)
 
 
 class AgentToolRequest(BaseModel):
-    tool_id: str = Field(..., min_length=1)
+    model_config = ConfigDict(extra="forbid")
+
+    tool_id: str = Field(..., min_length=1, max_length=MAX_TOOL_ID_LEN, pattern=r"^[a-zA-Z0-9_:-]+$")
     payload: dict[str, Any] = Field(default_factory=dict)
 
 
 class SelectToolRequest(BaseModel):
-    task: str = Field(..., min_length=1)
+    model_config = ConfigDict(extra="forbid")
+
+    task: str = Field(..., min_length=1, max_length=MAX_TASK_CHARS)
 
 
 class TaskStatusEnum(str, Enum):
@@ -220,8 +356,10 @@ class UsageResponse(BaseModel):
 
 
 class PlanSetRequest(BaseModel):
-    user_id: str = Field(..., min_length=1)
-    plan_name: str = Field(..., min_length=1)
+    model_config = ConfigDict(extra="forbid")
+
+    user_id: str = Field(..., min_length=1, max_length=MAX_USER_ID_LEN, pattern=r"^[a-zA-Z0-9_.:@-]+$")
+    plan_name: str = Field(..., min_length=1, max_length=MAX_PLAN_NAME_LEN, pattern=r"^[a-zA-Z0-9_-]+$")
 
 
 # -------------------------
@@ -229,7 +367,7 @@ class PlanSetRequest(BaseModel):
 # -------------------------
 
 @router.post("/agent/run", response_model=AgentRunResponse)
-def run_agent(data: AgentRunRequest, request: Request):
+def run_agent(data: AgentRunRequest, request: Request, response: Response):
     token = request.headers.get("Authorization")
     user_id = _resolve_request_user_id(request)
     plan_name = usage_store.get_user_plan(user_id, default_plan=os.getenv("DEFAULT_PLAN", "free"))
@@ -251,7 +389,7 @@ def run_agent(data: AgentRunRequest, request: Request):
         )
 
     if not is_pytest:
-        _enforce_request_limits(user_id, plan_name, "agent_run")
+        _enforce_request_limits(request, response, user_id, plan_name, "agent_run")
 
     policy = _maybe_degradation_policy(plan_name, usage, plan)
 
@@ -292,7 +430,7 @@ def select_tool_for_task(data: SelectToolRequest):
 # -------------------------
 
 @router.post("/agent/action", response_model=ActionResponse)
-def run_action(data: AgentActionRequest, request: Request):
+def run_action(data: AgentActionRequest, request: Request, response: Response):
     logger.info(f"--- Action Request: {data.tool} ---")
     token = request.headers.get("Authorization")
     user_id = _resolve_request_user_id(request)
@@ -312,7 +450,7 @@ def run_action(data: AgentActionRequest, request: Request):
             },
         )
     if not is_pytest:
-        _enforce_request_limits(user_id, plan_name, "agent_action")
+        _enforce_request_limits(request, response, user_id, plan_name, "agent_action")
 
     restricted = _restricted_tools_for_plan(plan_name)
     if data.tool in restricted:
@@ -325,6 +463,8 @@ def run_action(data: AgentActionRequest, request: Request):
             },
         )
     
+    _validate_payload(data.payload, source="agent_action")
+
     result = execute_tool(data.tool, data.payload, headers={"Authorization": token} if token else None)
 
     input_tokens = estimate_tokens(str(data.payload) if data.payload else data.tool)
@@ -345,7 +485,7 @@ def run_action(data: AgentActionRequest, request: Request):
 
 
 @router.post("/agent/tool", response_model=ToolResponse)
-def run_tool(data: AgentToolRequest, request: Request):
+def run_tool(data: AgentToolRequest, request: Request, response: Response):
     token = request.headers.get("Authorization")
     user_id = _resolve_request_user_id(request)
     plan_name = usage_store.get_user_plan(user_id, default_plan=os.getenv("DEFAULT_PLAN", "free"))
@@ -364,7 +504,7 @@ def run_tool(data: AgentToolRequest, request: Request):
             },
         )
     if not is_pytest:
-        _enforce_request_limits(user_id, plan_name, "agent_tool")
+        _enforce_request_limits(request, response, user_id, plan_name, "agent_tool")
 
     restricted = _restricted_tools_for_plan(plan_name)
     if data.tool_id in restricted:
@@ -376,6 +516,8 @@ def run_tool(data: AgentToolRequest, request: Request):
                 "tool": data.tool_id,
             },
         )
+
+    _validate_payload(data.payload, source="agent_tool")
 
     result = execute_tool(data.tool_id, data.payload, headers={"Authorization": token} if token else None)
 

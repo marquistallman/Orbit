@@ -7,3 +7,5 @@ pydantic
 python-docx
 pytest
 httpx
+redis
+prometheus-client
