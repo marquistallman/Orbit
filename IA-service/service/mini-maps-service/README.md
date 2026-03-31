@@ -1,6 +1,14 @@
 # mini-maps-service
 
-Microservicio de mini mapas por coordenadas con salida rápida ASCII y mapa interactivo HTML.
+Microservicio de mapa interactivo con Leaflet para crear marcadores circulares de puntos de interes.
+
+## Lo que hace
+
+- Renderiza un mapa interactivo en navegador.
+- Permite crear puntos haciendo clic sobre el mapa.
+- Cada punto se crea con color personalizado y radio configurable.
+- Cada marcador se puede editar (nombre, color, radio) o eliminar desde su popup.
+- Los puntos se guardan por usuario (`points_<user_id>.json`) para persistencia basica.
 
 ## Puerto
 
@@ -8,51 +16,76 @@ Microservicio de mini mapas por coordenadas con salida rápida ASCII y mapa inte
 
 ## Variables de entorno
 
-- `OUTPUT_DIR` (opcional): ruta de salida para mapas HTML generados.
+- `OUTPUT_DIR` (opcional): carpeta donde se guarda `points.json`.
+- `DEFAULT_CENTER_LAT` (opcional): latitud inicial del mapa.
+- `DEFAULT_CENTER_LNG` (opcional): longitud inicial del mapa.
+- `DEFAULT_ZOOM` (opcional): zoom inicial del mapa.
 
 ## Endpoints
 
 ### `GET /`
-Health check.
+Devuelve la interfaz web del mapa interactivo.
 
-### `POST /map`
-Genera un mini mapa a partir de puntos (x, y) y crea un archivo HTML interactivo.
+Parámetro opcional:
 
-Request:
+- `user_id`: aísla los puntos por usuario. Ejemplo: `/?user_id=usuario_123`.
 
-```json
-{
-  "title": "Ruta Demo",
-  "points": [
-    {"name": "Casa", "x": 1, "y": 1},
-    {"name": "Oficina", "x": 6, "y": 2},
-    {"name": "Parque", "x": 4, "y": 6}
-  ]
-}
-```
+### `GET /health`
+Health check JSON.
 
-Rango válido de coordenadas para grid ASCII: `0..8` en `x` y `y`.
+### `GET /api/points`
+Lista puntos guardados.
 
-Response ejemplo:
+### `POST /api/points`
+Crea un punto nuevo.
+
+Request ejemplo:
 
 ```json
 {
-  "title": "Ruta Demo",
-  "grid_size": "9x9",
-  "point_count": 3,
-  "map_lines": [". . . . . . . . .", "..."],
-  "legend": [
-    {"marker": "A", "name": "Casa", "x": 1, "y": 1}
-  ],
-  "interactive_map_file": "Ruta_Demo.html",
-  "interactive_map_path": "/data/Ruta_Demo.html"
+  "name": "Zona de prueba",
+  "lat": 4.6373,
+  "lng": -74.0840,
+  "color": "#22aa88",
+  "radius": 14
 }
 ```
 
-### `GET /files/{file_name}`
-Descarga/abre el HTML del mapa interactivo.
+### `PUT /api/points/{point_id}/color`
+Actualiza el color de un marcador.
 
-## Ejecución local
+Request ejemplo:
+
+```json
+{
+  "color": "#ff6b35"
+}
+```
+
+### `DELETE /api/points/{point_id}`
+Elimina un marcador.
+
+### `PUT /api/points/{point_id}`
+Actualiza nombre, color y radio de un marcador.
+
+Request ejemplo:
+
+```json
+{
+  "name": "Punto actualizado",
+  "color": "#2e90fa",
+  "radius": 20
+}
+```
+
+### `POST /map` (compatibilidad)
+Endpoint legado para integraciones existentes (ej. tool `mini_maps`).
+
+- Recibe puntos en formato `x,y` (0..8).
+- Sobrescribe el conjunto de puntos del `user_id` indicado (o `anonymous`).
+- Devuelve `map_lines`, `legend` e `interactive_map_url`.
+
+## Ejecucion local
 
 ```bash
 uvicorn main:app --host 0.0.0.0 --port 9005
@@ -61,4 +94,5 @@ uvicorn main:app --host 0.0.0.0 --port 9005
 ## Dependencias
 
 - FastAPI
-- folium
+- pydantic
+- uvicorn

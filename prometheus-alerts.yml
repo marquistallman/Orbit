@@ -1,0 +1,29 @@
+groups:
+  - name: orbit-security-ratelimit
+    rules:
+      - alert: OrbitIaServiceHighThrottleRate
+        expr: sum(rate(orbit_rate_limit_throttles_total[5m])) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: IA-service throttling elevated
+          description: Rate limit throttles are above expected baseline for at least 10 minutes.
+
+      - alert: OrbitIaServiceAdaptiveTighteningActive
+        expr: sum(rate(orbit_rate_limit_adaptive_tightening_events_total[15m])) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: Adaptive tightening remains active
+          description: Adaptive tightening has been active continuously for at least 15 minutes.
+
+      - alert: OrbitIaServiceThrottleCooldownSpike
+        expr: sum(rate(orbit_rate_limit_checks_total{decision="blocked",reason=~"rate_limit_cooldown|cooldown_active"}[5m])) > 0.05
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: Cooldown-based blocks are rising
+          description: Cooldown-related blocks indicate repeated abusive request patterns.

@@ -2,6 +2,23 @@
 
 This service is responsible for user authentication and management.
 
+## Monitoring and Prometheus
+
+This service includes Spring Boot Actuator + Micrometer Prometheus registry.
+
+- Metrics endpoint: `/actuator/prometheus`
+- Health endpoint: `/actuator/health`
+
+In docker-compose execution, Prometheus scrapes:
+
+- `http://auth-service:8080/actuator/prometheus`
+
+Security note:
+
+- `/actuator/prometheus` and `/actuator/health` are allowed for monitoring scrape.
+- Business/auth API endpoints are unchanged and keep their existing auth rules.
+- This does not change frontend login/register flows.
+
 ## Running the service
 
 To run the service, you can use the following Maven command:

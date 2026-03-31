@@ -7,6 +7,11 @@ from datetime import datetime, timezone
 from collections import deque
 from typing import Any
 
+try:
+    import redis
+except ImportError:  # pragma: no cover - optional dependency in some local setups
+    redis = None
+
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -90,8 +95,15 @@ class PlanCatalog:
 class UsageStore:
     def __init__(self, db_path: str):
         _ensure_db_dir(db_path)
-        self.conn = sqlite3.connect(db_path, check_same_thread=False)
+        self.db_path = db_path
+        self.conn = sqlite3.connect(db_path, check_same_thread=False, timeout=30.0)
         self.conn.row_factory = sqlite3.Row
+        # Enable WAL mode for better concurrency and durability
+        self.conn.execute("PRAGMA journal_mode=WAL")
+        # Ensure fsync happens for data durability
+        self.conn.execute("PRAGMA synchronous=FULL")
+        # Set connection timeout for lock contention
+        self.conn.execute("PRAGMA busy_timeout=30000")
         self._create_tables()
 
     def _create_tables(self) -> None:
@@ -130,17 +142,24 @@ class UsageStore:
     def set_user_plan(self, user_id: str, plan_name: str) -> None:
         cur = self.conn.cursor()
         now = _utc_now()
-        cur.execute(
-            """
-            INSERT INTO user_plan (user_id, plan_name, updated_at)
-            VALUES (?, ?, ?)
-            ON CONFLICT(user_id) DO UPDATE SET
-                plan_name=excluded.plan_name,
-                updated_at=excluded.updated_at
-            """,
-            (user_id, plan_name, now),
-        )
-        self.conn.commit()
+        try:
+            cur.execute(
+                """
+                INSERT INTO user_plan (user_id, plan_name, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    plan_name=excluded.plan_name,
+                    updated_at=excluded.updated_at
+                """,
+                (user_id, plan_name, now),
+            )
+            self.conn.commit()
+            # Force checkpoint for WAL persistence
+            self.conn.execute("PRAGMA wal_checkpoint(RESTART)")
+        except sqlite3.Error as e:
+            print(f"ERROR: Failed to set plan for {user_id}: {e}")
+            self.conn.rollback()
+            raise
 
     def get_month_usage(self, user_id: str, month_key: str | None = None) -> dict[str, Any]:
         mk = month_key or _month_key()
@@ -178,20 +197,27 @@ class UsageStore:
         mk = _month_key()
         now = _utc_now()
         cur = self.conn.cursor()
-        cur.execute(
-            """
-            INSERT INTO usage_monthly (user_id, month_key, prompt_count, input_tokens, output_tokens, estimated_cost_usd, updated_at)
-            VALUES (?, ?, 1, ?, ?, ?, ?)
-            ON CONFLICT(user_id, month_key) DO UPDATE SET
-                prompt_count=prompt_count + 1,
-                input_tokens=input_tokens + excluded.input_tokens,
-                output_tokens=output_tokens + excluded.output_tokens,
-                estimated_cost_usd=estimated_cost_usd + excluded.estimated_cost_usd,
-                updated_at=excluded.updated_at
-            """,
-            (user_id, mk, input_tokens, output_tokens, cost_usd, now),
-        )
-        self.conn.commit()
+        try:
+            cur.execute(
+                """
+                INSERT INTO usage_monthly (user_id, month_key, prompt_count, input_tokens, output_tokens, estimated_cost_usd, updated_at)
+                VALUES (?, ?, 1, ?, ?, ?, ?)
+                ON CONFLICT(user_id, month_key) DO UPDATE SET
+                    prompt_count=prompt_count + 1,
+                    input_tokens=input_tokens + excluded.input_tokens,
+                    output_tokens=output_tokens + excluded.output_tokens,
+                    estimated_cost_usd=estimated_cost_usd + excluded.estimated_cost_usd,
+                    updated_at=excluded.updated_at
+                """,
+                (user_id, mk, input_tokens, output_tokens, cost_usd, now),
+            )
+            self.conn.commit()
+            # Force checkpoint for WAL persistence
+            self.conn.execute("PRAGMA wal_checkpoint(RESTART)")
+        except sqlite3.Error as e:
+            print(f"ERROR: Failed to add usage for {user_id}: {e}")
+            self.conn.rollback()
+            raise
         return self.get_month_usage(user_id, mk)
 
 
@@ -224,31 +250,230 @@ def usage_percentage(usage: dict[str, Any], plan: dict[str, Any]) -> float:
     return max(prompt_ratio, input_ratio, output_ratio)
 
 
+def _adaptive_effective_limit(max_requests: int, violations: int) -> tuple[int, bool]:
+    if violations >= 6:
+        factor = 0.25
+    elif violations >= 4:
+        factor = 0.4
+    elif violations >= 2:
+        factor = 0.6
+    else:
+        factor = 1.0
+    effective = max(1, int(max_requests * factor))
+    return effective, effective < max_requests
+
+
 class RequestRateLimiter:
     """Simple in-memory sliding-window rate limiter keyed by user and endpoint."""
 
     def __init__(self):
         self._events: dict[str, deque[float]] = {}
+        self._blocked_until: dict[str, float] = {}
+        self._violations: dict[str, int] = {}
         self._lock = threading.Lock()
 
     def check(self, key: str, max_requests: int, window_seconds: int) -> dict[str, Any]:
         now = time.time()
         with self._lock:
-            q = self._events.setdefault(key, deque())
-            while q and now - q[0] > window_seconds:
-                q.popleft()
-
-            if len(q) >= max_requests:
-                retry_after = int(max(1, window_seconds - (now - q[0])))
+            current_violations = max(0, int(self._violations.get(key, 0)))
+            effective_limit, adaptive_tightening = _adaptive_effective_limit(max_requests, current_violations)
+            blocked_until = self._blocked_until.get(key, 0.0)
+            if blocked_until > now:
+                retry_after = int(max(1, blocked_until - now))
                 return {
                     "allowed": False,
                     "retry_after_seconds": retry_after,
                     "remaining": 0,
+                    "reason": "cooldown_active",
+                    "limit": max_requests,
+                    "effective_limit": effective_limit,
+                    "adaptive_tightening": adaptive_tightening,
+                    "window_seconds": window_seconds,
+                    "violations": current_violations,
                 }
+
+            q = self._events.setdefault(key, deque())
+            while q and now - q[0] > window_seconds:
+                q.popleft()
+
+            if len(q) >= effective_limit:
+                base_retry = int(max(1, window_seconds - (now - q[0])))
+                violations = self._violations.get(key, 0) + 1
+                self._violations[key] = violations
+                effective_limit, adaptive_tightening = _adaptive_effective_limit(max_requests, violations)
+
+                # Progressive cooldowns for repeated abuse within the same runtime.
+                if violations >= 6:
+                    cooldown = 300
+                elif violations >= 4:
+                    cooldown = 120
+                elif violations >= 2:
+                    cooldown = 30
+                else:
+                    cooldown = 0
+
+                if cooldown > 0:
+                    self._blocked_until[key] = now + cooldown
+                    retry_after = max(base_retry, cooldown)
+                    reason = "rate_limit_cooldown"
+                else:
+                    retry_after = base_retry
+                    reason = "rate_limit_window"
+
+                return {
+                    "allowed": False,
+                    "retry_after_seconds": retry_after,
+                    "remaining": 0,
+                    "reason": reason,
+                    "limit": max_requests,
+                    "effective_limit": effective_limit,
+                    "adaptive_tightening": adaptive_tightening,
+                    "window_seconds": window_seconds,
+                    "violations": violations,
+                }
+
+            # Gradually heal violation count when requests stay within limits.
+            if key in self._violations and self._violations[key] > 0:
+                self._violations[key] -= 1
+
+            healed_violations = max(0, int(self._violations.get(key, 0)))
+            effective_limit, adaptive_tightening = _adaptive_effective_limit(max_requests, healed_violations)
 
             q.append(now)
             return {
                 "allowed": True,
                 "retry_after_seconds": 0,
-                "remaining": max(0, max_requests - len(q)),
+                "remaining": max(0, effective_limit - len(q)),
+                "reason": None,
+                "limit": max_requests,
+                "effective_limit": effective_limit,
+                "adaptive_tightening": adaptive_tightening,
+                "window_seconds": window_seconds,
+                "violations": healed_violations,
             }
+
+
+class RedisRequestRateLimiter:
+    """Redis-backed rate limiter for multi-instance deployments."""
+
+    def __init__(self, redis_client: Any, *, prefix: str = "orbit", violation_ttl_seconds: int = 3600):
+        self._redis = redis_client
+        self._prefix = prefix
+        self._violation_ttl_seconds = max(60, int(violation_ttl_seconds))
+
+    def _key(self, kind: str, base: str) -> str:
+        return f"{self._prefix}:rate:{kind}:{base}"
+
+    def check(self, key: str, max_requests: int, window_seconds: int) -> dict[str, Any]:
+        violations = max(0, int(self._redis.get(self._key("viol", key)) or 0))
+        effective_limit, adaptive_tightening = _adaptive_effective_limit(max_requests, violations)
+
+        blocked_key = self._key("blocked", key)
+        window_key = self._key("window", key)
+        violation_key = self._key("viol", key)
+
+        blocked_ttl = int(self._redis.ttl(blocked_key) or -1)
+        if blocked_ttl > 0:
+            return {
+                "allowed": False,
+                "retry_after_seconds": blocked_ttl,
+                "remaining": 0,
+                "reason": "cooldown_active",
+                "limit": max_requests,
+                "effective_limit": effective_limit,
+                "adaptive_tightening": adaptive_tightening,
+                "window_seconds": window_seconds,
+                "violations": violations,
+            }
+
+        count = int(self._redis.incr(window_key))
+        if count == 1:
+            self._redis.expire(window_key, max(1, window_seconds))
+
+        if count > effective_limit:
+            base_retry = int(self._redis.ttl(window_key) or window_seconds)
+
+            violations = int(self._redis.incr(violation_key))
+            if violations == 1:
+                self._redis.expire(violation_key, self._violation_ttl_seconds)
+
+            effective_limit, adaptive_tightening = _adaptive_effective_limit(max_requests, violations)
+
+            if violations >= 6:
+                cooldown = 300
+            elif violations >= 4:
+                cooldown = 120
+            elif violations >= 2:
+                cooldown = 30
+            else:
+                cooldown = 0
+
+            if cooldown > 0:
+                self._redis.setex(blocked_key, cooldown, "1")
+                retry_after = max(base_retry, cooldown)
+                reason = "rate_limit_cooldown"
+            else:
+                retry_after = max(1, base_retry)
+                reason = "rate_limit_window"
+
+            return {
+                "allowed": False,
+                "retry_after_seconds": retry_after,
+                "remaining": 0,
+                "reason": reason,
+                "limit": max_requests,
+                "effective_limit": effective_limit,
+                "adaptive_tightening": adaptive_tightening,
+                "window_seconds": window_seconds,
+                "violations": violations,
+            }
+
+        # Soften violation score while traffic stays within limits.
+        v = int(self._redis.get(violation_key) or 0)
+        if v > 0:
+            new_v = self._redis.decr(violation_key)
+            if int(new_v or 0) <= 0:
+                self._redis.delete(violation_key)
+            v = max(0, int(new_v or 0))
+
+        effective_limit, adaptive_tightening = _adaptive_effective_limit(max_requests, v)
+
+        return {
+            "allowed": True,
+            "retry_after_seconds": 0,
+            "remaining": max(0, effective_limit - count),
+            "reason": None,
+            "limit": max_requests,
+            "effective_limit": effective_limit,
+            "adaptive_tightening": adaptive_tightening,
+            "window_seconds": window_seconds,
+            "violations": v,
+        }
+
+
+def create_rate_limiter() -> RequestRateLimiter | RedisRequestRateLimiter:
+    backend = os.getenv("RATE_LIMIT_BACKEND", "memory").strip().lower()
+    if backend != "redis":
+        return RequestRateLimiter()
+
+    if redis is None:
+        print("WARNING: RATE_LIMIT_BACKEND=redis but redis package is not installed; using memory limiter")
+        return RequestRateLimiter()
+
+    redis_url = os.getenv("RATE_LIMIT_REDIS_URL", "redis://localhost:6379/0")
+    prefix = os.getenv("RATE_LIMIT_REDIS_PREFIX", "orbit")
+    socket_timeout = float(os.getenv("RATE_LIMIT_REDIS_SOCKET_TIMEOUT_SECONDS", "1.0"))
+    violation_ttl_seconds = int(os.getenv("RATE_LIMIT_COOLDOWN_VIOLATION_TTL_SECONDS", "3600"))
+
+    try:
+        client = redis.Redis.from_url(redis_url, socket_timeout=socket_timeout, decode_responses=True)
+        client.ping()
+        print(f"INFO: Using Redis rate limiter ({redis_url})")
+        return RedisRequestRateLimiter(
+            client,
+            prefix=prefix,
+            violation_ttl_seconds=violation_ttl_seconds,
+        )
+    except Exception as exc:
+        print(f"WARNING: Redis limiter unavailable ({exc}); using memory limiter")
+        return RequestRateLimiter()

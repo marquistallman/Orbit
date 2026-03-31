@@ -13,6 +13,46 @@ Servicio de IA backend para el proyecto Orbit, construido con FastAPI. Proporcio
 - 🔒 **Robustez de red**: Timeouts configurables, validación HTTP, manejo de errores resiliente.
 - 🐳 **Docker-ready**: Dockerfile optimizado y docker-compose con variables de entorno.
 
+## Novedades de seguridad y observabilidad (Fase 2/3)
+
+- **Rate limit distribuido** con backend Redis (fallback automatico a memoria si Redis no esta disponible).
+- **Endurecimiento adaptativo**: al detectar abuso repetido, reduce temporalmente el limite efectivo y aplica cooldown progresivo.
+- **Headers de control** en respuestas de endpoints protegidos:
+  - `X-RateLimit-Limit`
+  - `X-RateLimit-Limit-Base`
+  - `X-RateLimit-Remaining`
+  - `X-RateLimit-Reset`
+  - `X-RateLimit-Adaptive`
+  - `Retry-After` (cuando retorna `429`).
+- **Validacion estricta de entrada** en payloads y user identifiers.
+- **Metricas Prometheus reales** expuestas en `GET /metrics` (formato OpenMetrics), incluyendo:
+  - `orbit_rate_limit_checks_total`
+  - `orbit_rate_limit_throttles_total`
+  - `orbit_rate_limit_retry_after_seconds`
+  - `orbit_rate_limit_effective_limit`
+  - `orbit_rate_limit_adaptive_tightening`
+  - `orbit_rate_limit_adaptive_tightening_events_total`
+- **Logging estructurado de seguridad** para eventos de bloqueo y adaptacion.
+
+## Variables de entorno recomendadas (rate limit y metricas)
+
+Adicionales a las variables base ya existentes:
+
+```
+RATE_LIMIT_BACKEND=redis
+RATE_LIMIT_REDIS_URL=redis://redis:6379/0
+RATE_LIMIT_REDIS_PREFIX=orbit
+RATE_LIMIT_MULTIPLIER_AGENT_RUN=1.0
+RATE_LIMIT_MULTIPLIER_AGENT_ACTION=0.7
+RATE_LIMIT_MULTIPLIER_AGENT_TOOL=0.6
+SECURITY_METRICS_ENABLED=true
+```
+
+Notas:
+
+- Si `RATE_LIMIT_BACKEND=redis` y Redis no responde, el servicio cae de forma segura a limiter en memoria.
+- En despliegues con varias replicas, se recomienda Redis para consistencia entre instancias.
+
 ## Documentación adicional
 
 - Perfiles de costos y planes (Free/Lite/Standard/Pro): [README_COST_PROFILES.md](README_COST_PROFILES.md)
@@ -322,6 +362,9 @@ Health check del servicio.
 }
 ```
 
+#### GET `/metrics`
+Expone metricas Prometheus para observabilidad y alertas.
+
 ## Estructura del proyecto
 
 ```
@@ -443,9 +486,12 @@ CODE_SQL_BLOCK_PATTERNS=
 - Puerto por defecto: `9003`.
 
 ### mini-maps-service
-- `POST /map`: genera mini mapa `9x9` con puntos (x, y) y crea salida interactiva HTML.
-- Devuelve `map_lines` (ASCII grid), `legend` y archivo `interactive_map_file`.
-- `GET /files/{file_name}`: descarga/abre el mapa HTML generado.
+- `GET /`: UI interactiva con Leaflet para crear marcadores circulares.
+- `GET /api/points`: lista puntos persistidos por `user_id`.
+- `POST /api/points`: crea marcador con `name`, `lat`, `lng`, `color`, `radius`.
+- `PUT /api/points/{point_id}`: edita nombre, color y radio.
+- `DELETE /api/points/{point_id}`: elimina marcador.
+- `POST /map`: endpoint legado compatible con integración por coordenadas `x,y`.
 - Puerto por defecto: `9005`.
 
 ### Integración frontend
@@ -465,9 +511,9 @@ CODE_SQL_BLOCK_PATTERNS=
 - ✅ Editar documentos existentes vía `POST /apply-changes` para cambios enviados por IA.
 
 ### #38 Mini Maps
-- ✅ Microservicio dedicado con entrada por coordenadas.
-- ✅ Salida de mapa estructurado + mapa interactivo HTML.
-- ✅ Exposición por API para consumo desde frontend o agente.
+- ✅ Microservicio dedicado con mapa interactivo y marcadores editables.
+- ✅ Persistencia de puntos por usuario (`user_id`).
+- ✅ Exposición por API para consumo desde frontend o agente (incluye endpoint legado).
 
 ### #39 Pequeño editor de código
 - ✅ Microservicio independiente con baja interacción con otros servicios.

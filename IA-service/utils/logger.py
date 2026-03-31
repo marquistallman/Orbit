@@ -1,5 +1,7 @@
 import logging
 import os
+import json
+from datetime import datetime, timezone
 
 LOG_FOLDER = "logs"
 LOG_FILE = "logs/api_log.txt"
@@ -18,3 +20,12 @@ formatter = logging.Formatter(
 file_handler.setFormatter(formatter)
 
 logger.addHandler(file_handler)
+
+
+def log_security_event(event_type: str, **fields):
+    payload = {
+        "event_type": event_type,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        **fields,
+    }
+    logger.info(json.dumps(payload, ensure_ascii=True, separators=(",", ":")))

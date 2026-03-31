@@ -5,6 +5,7 @@ logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from ai.security_observability import prometheus_metrics_response
 from routes.agent_routes import router as agent_router
 
 app = FastAPI(
@@ -34,4 +35,4 @@ def health_check():
 # Endpoint para evitar 404 de Prometheus
 @app.get("/metrics")
 def metrics():
-    return {"status": "ok"}
+    return prometheus_metrics_response()

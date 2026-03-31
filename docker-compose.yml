@@ -42,10 +42,29 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - MEMORY_DB_PATH=${MEMORY_DB_PATH:-/data/agent_memory.db}
+      - USAGE_DB_PATH=${USAGE_DB_PATH:-/data/usage.db}
+      - RATE_LIMIT_BACKEND=${RATE_LIMIT_BACKEND:-redis}
+      - RATE_LIMIT_REDIS_URL=${RATE_LIMIT_REDIS_URL:-redis://redis:6379/0}
+      - RATE_LIMIT_REDIS_PREFIX=${RATE_LIMIT_REDIS_PREFIX:-orbit}
+      - RATE_LIMIT_MULTIPLIER_AGENT_RUN=${RATE_LIMIT_MULTIPLIER_AGENT_RUN:-1.0}
+      - RATE_LIMIT_MULTIPLIER_AGENT_ACTION=${RATE_LIMIT_MULTIPLIER_AGENT_ACTION:-0.7}
+      - RATE_LIMIT_MULTIPLIER_AGENT_TOOL=${RATE_LIMIT_MULTIPLIER_AGENT_TOOL:-0.6}
     networks:
       - orbit-network
+    depends_on:
+      - redis
     # Forzamos a FastAPI a escuchar en 0.0.0.0 para que sea accesible desde fuera
     command: uvicorn main:app --host 0.0.0.0 --port 5000
+  redis:
+    image: redis:7-alpine
+    container_name: orbit-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    networks:
+      - orbit-network
   gmail-service:
     build:
       context: ./gmail-service
@@ -118,12 +137,22 @@ services:
       dockerfile: Dockerfile
     ports:
       - "9005:9005"
+    volumes:
+      - ./db/generated/mini-maps:/data
+    environment:
+      - OUTPUT_DIR=/data
+      - DEFAULT_CENTER_LAT=4.6373
+      - DEFAULT_CENTER_LNG=-74.0840
+      - DEFAULT_ZOOM=16
+      - DEFAULT_USER_ID=anonymous
     networks:
       - orbit-network
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_MINI_MAPS_URL: http://localhost:9005
     ports:
       - "5173:80"
     depends_on:
@@ -134,12 +163,14 @@ services:
     # Variable de entorno común para que herramientas como Vite/React expongan el puerto
     environment:
       - HOST=0.0.0.0
+      - VITE_MINI_MAPS_URL=http://localhost:9005
 
   prometheus:
     image: prom/prometheus:latest
     container_name: orbit-prometheus
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus-alerts.yml:/etc/prometheus/alerts.yml
     ports:
       - "9090:9090"
     networks:
@@ -158,3 +189,6 @@ services:
 networks:
   orbit-network:
     driver: bridge
+
+volumes:
+  redis-data:
