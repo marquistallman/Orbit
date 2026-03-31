@@ -9,6 +9,7 @@ type PlanCard = {
   key: PlanKey
   title: string
   tagline: string
+  monthlyPriceCop: number
   monthlyPrompts: number
   monthlyInputTokens: number
   monthlyOutputTokens: number
@@ -22,6 +23,7 @@ const PLAN_CARDS: PlanCard[] = [
     key: 'free',
     title: 'Free',
     tagline: 'Para probar sin friccion',
+    monthlyPriceCop: 0,
     monthlyPrompts: 80,
     monthlyInputTokens: 120000,
     monthlyOutputTokens: 60000,
@@ -33,6 +35,7 @@ const PLAN_CARDS: PlanCard[] = [
     key: 'lite',
     title: 'Lite',
     tagline: 'Uso personal continuo',
+    monthlyPriceCop: 9900,
     monthlyPrompts: 300,
     monthlyInputTokens: 360000,
     monthlyOutputTokens: 150000,
@@ -44,6 +47,7 @@ const PLAN_CARDS: PlanCard[] = [
     key: 'standard',
     title: 'Standard',
     tagline: 'Equipos con flujo diario',
+    monthlyPriceCop: 20900,
     monthlyPrompts: 1500,
     monthlyInputTokens: 2700000,
     monthlyOutputTokens: 1050000,
@@ -55,6 +59,7 @@ const PLAN_CARDS: PlanCard[] = [
     key: 'pro',
     title: 'Pro',
     tagline: 'Carga alta y automatizacion',
+    monthlyPriceCop: 49900,
     monthlyPrompts: 6000,
     monthlyInputTokens: 13200000,
     monthlyOutputTokens: 6000000,
@@ -68,12 +73,18 @@ function fmt(n: number): string {
   return new Intl.NumberFormat('en-US').format(n)
 }
 
+function fmtCop(n: number): string {
+  return new Intl.NumberFormat('es-CO').format(n)
+}
+
 export default function PlansPage() {
   const { user } = useAuthStore()
   const [plan, setPlan] = useState<AgentPlanResponse | null>(null)
   const [usage, setUsage] = useState<AgentUsageResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [checkoutOpen, setCheckoutOpen] = useState(false)
+  const [checkoutPlan, setCheckoutPlan] = useState<PlanCard | null>(null)
 
   useEffect(() => {
     let active = true
@@ -101,37 +112,16 @@ export default function PlansPage() {
 
   const currentPlan = (usage?.plan_name || plan?.plan?.name || 'free').toLowerCase()
 
-  const handleUpgradeClick = async (planKey: PlanKey) => {
+  const handleUpgradeClick = (planKey: PlanKey) => {
+    const selected = PLAN_CARDS.find((item) => item.key === planKey)
+    if (!selected) return
+
     if (planKey === currentPlan) {
       alert('Ya tienes este plan')
       return
     }
-    if (!user) {
-      alert('Error: Usuario no autenticado')
-      return
-    }
-    try {
-      const response = await fetch('/api/agent/plan', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
-        },
-        body: JSON.stringify({ user_id: user.id, plan_name: planKey })
-      })
-      if (!response.ok) {
-        const err = await response.json()
-        throw new Error(err.detail || 'Error upgrading plan')
-      }
-      alert(`Plan actualizado a: ${planKey}`)
-      // Reload plan data
-      const planData = await getAgentPlan()
-      const usageData = await getAgentUsage()
-      setPlan(planData)
-      setUsage(usageData)
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Error al cambiar plan')
-    }
+    setCheckoutPlan(selected)
+    setCheckoutOpen(true)
   }
 
   const usageSummary = useMemo(() => {
@@ -258,6 +248,117 @@ export default function PlansPage() {
             </div>
           </div>
         </DashCard>
+      )}
+
+      {checkoutOpen && checkoutPlan && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.68)',
+            backdropFilter: 'blur(2px)',
+            zIndex: 60,
+            display: 'grid',
+            placeItems: 'center',
+            padding: 18,
+          }}
+        >
+          <div
+            style={{
+              width: 'min(980px, 96vw)',
+              borderRadius: 20,
+              border: '1px solid rgba(198,161,91,0.24)',
+              background: '#1d1d1d',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.42)',
+              padding: 20,
+              display: 'grid',
+              gap: 16,
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ color: '#EDE6D6', fontSize: 28, fontWeight: 600 }}>Configura tu plan</div>
+              <button
+                onClick={() => setCheckoutOpen(false)}
+                style={{
+                  border: '1px solid rgba(198,161,91,0.28)',
+                  background: 'transparent',
+                  color: '#C6A15B',
+                  borderRadius: 999,
+                  width: 32,
+                  height: 32,
+                  cursor: 'pointer',
+                }}
+                aria-label="Cerrar"
+              >
+                x
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 16 }}>
+              <div style={{ display: 'grid', gap: 14 }}>
+                <div style={{ color: '#EDE6D6', fontSize: 18, marginBottom: 4 }}>Metodo de pago</div>
+                <div style={{ display: 'grid', gap: 10 }}>
+                  <input placeholder="Numero de tarjeta" style={{ border: '1px solid rgba(198,161,91,0.16)', borderRadius: 12, background: '#2b2b2b', color: '#EDE6D6', fontSize: 15, padding: '14px 12px' }} />
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <input placeholder="Fecha de caducidad" style={{ border: '1px solid rgba(198,161,91,0.16)', borderRadius: 12, background: '#2b2b2b', color: '#EDE6D6', fontSize: 15, padding: '14px 12px' }} />
+                    <input placeholder="Codigo de seguridad" style={{ border: '1px solid rgba(198,161,91,0.16)', borderRadius: 12, background: '#2b2b2b', color: '#EDE6D6', fontSize: 15, padding: '14px 12px' }} />
+                  </div>
+                </div>
+
+                <div style={{ color: '#EDE6D6', fontSize: 18, marginBottom: 4, marginTop: 4 }}>Direccion de facturacion</div>
+                <div style={{ display: 'grid', gap: 10 }}>
+                  <input placeholder="Nombre completo" defaultValue={user?.username || ''} style={{ border: '1px solid rgba(198,161,91,0.16)', borderRadius: 12, background: '#2b2b2b', color: '#EDE6D6', fontSize: 15, padding: '14px 12px' }} />
+                  <input placeholder="Pais o region" defaultValue="Colombia" style={{ border: '1px solid rgba(198,161,91,0.16)', borderRadius: 12, background: '#2b2b2b', color: '#EDE6D6', fontSize: 15, padding: '14px 12px' }} />
+                  <input placeholder="Linea 1 de direccion" style={{ border: '1px solid rgba(198,161,91,0.16)', borderRadius: 12, background: '#2b2b2b', color: '#EDE6D6', fontSize: 15, padding: '14px 12px' }} />
+                </div>
+              </div>
+
+              <div style={{ border: '1px solid rgba(198,161,91,0.24)', borderRadius: 20, background: '#2a2a2a', padding: 20, display: 'grid', gap: 14, alignContent: 'start' }}>
+                <div style={{ color: '#EDE6D6', fontSize: 36, fontWeight: 600 }}>Plan {checkoutPlan.title}</div>
+                <div style={{ color: '#EDE6D6', fontSize: 16, marginBottom: 6 }}>Funciones destacadas</div>
+                <div style={{ display: 'grid', gap: 10, color: '#EDE6D6', fontSize: 15 }}>
+                  <div>Respuestas mas rapidas e inteligentes</div>
+                  <div>Mas mensajes y cargas</div>
+                  <div>Memoria y contexto adicionales</div>
+                </div>
+                <div style={{ height: 1, background: 'rgba(255,255,255,0.12)', margin: '8px 0' }} />
+                <div style={{ display: 'grid', gap: 6, fontSize: 15 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#EDE6D6' }}>
+                    <span>Mensual suscripcion</span>
+                    <span>$ {fmtCop(checkoutPlan.monthlyPriceCop)},00</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#EDE6D6' }}>
+                    <span>VAT (0%)</span>
+                    <span>$ 0,00</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#EDE6D6', fontWeight: 700, marginTop: 4 }}>
+                    <span>Importe a pagar hoy</span>
+                    <span>$ {fmtCop(checkoutPlan.monthlyPriceCop)},00</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => alert('Checkout implementado en UI. Siguiente paso: conectar pasarela (Stripe/Wompi) y confirmar suscripcion en backend.')}
+                  style={{
+                    marginTop: 6,
+                    width: '100%',
+                    border: '1px solid rgba(198,161,91,0.35)',
+                    borderRadius: 999,
+                    background: '#EDE6D6',
+                    color: '#1b1b1b',
+                    fontSize: 18,
+                    padding: '12px 16px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Suscribirme
+                </button>
+                <div style={{ color: '#d7c9ad', fontSize: 12, lineHeight: 1.35 }}>
+                  Se renueva mensualmente hasta que se cancele. Al suscribirte, aceptas terminos y politica de privacidad.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
