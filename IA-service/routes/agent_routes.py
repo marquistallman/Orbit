@@ -180,6 +180,7 @@ class FinanceTransactionsListResponse(BaseModel):
     transactions: list[FinanceTransactionResponse]
     total: int
     synced_from: str
+    sync_warning: str | None = None
 
 
 def _emails_to_transactions(emails: list) -> list:
@@ -270,6 +271,7 @@ def sync_finance_transactions(request: Request):
         raise HTTPException(status_code=401, detail="user_id required")
 
     # 1. Disparar sync en Gmail-service (trae correos nuevos a la DB)
+    sync_warning = None
     try:
         _requests.get(
             f"{GMAIL_SERVICE_URL}/emails/sync",
@@ -278,6 +280,7 @@ def sync_finance_transactions(request: Request):
         ).raise_for_status()
     except Exception as e:
         logger.warning(f"Gmail sync parcial o fallido, usando cache: {e}")
+        sync_warning = "Gmail sync failed — showing cached data. Reconnect your Google account in Apps."
 
     # 2. Leer emails actualizados de la DB
     try:
@@ -293,7 +296,7 @@ def sync_finance_transactions(request: Request):
         raise HTTPException(status_code=502, detail=f"Gmail service error: {str(e)}")
 
     transactions = _emails_to_transactions(emails)
-    return {"transactions": transactions, "total": len(transactions), "synced_from": "gmail"}
+    return {"transactions": transactions, "total": len(transactions), "synced_from": "gmail", "sync_warning": sync_warning}
 
 
 @router.get("/finance/debug")

@@ -229,6 +229,7 @@ export default function FinancePage() {
   const [catModal,     setCatModal]     = useState(false)
   const [hovTx,        setHovTx]        = useState<string | null>(null)
   const [loading,      setLoading]      = useState(false)
+  const [syncWarning,  setSyncWarning]  = useState<string | null>(null)
 
   // Picker state — managed in FinancePage so it always sees latest categoryDefs
   const [picker, setPicker] = useState<{
@@ -419,9 +420,11 @@ export default function FinancePage() {
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={() => {
               setLoading(true)
-              syncTransactions().then(txs => {
+              setSyncWarning(null)
+              syncTransactions().then(({ transactions: txs, warning }) => {
                 setTransactions(txs)
                 recalc(txs, categoryDefs)
+                setSyncWarning(warning)
                 setLoading(false)
               })
             }} disabled={loading} style={{
@@ -432,6 +435,19 @@ export default function FinancePage() {
             <div onClick={() => setExpanded(true)} style={{ fontSize: 10, color: '#C6A15B', cursor: 'pointer', lineHeight: '26px' }}>View all</div>
           </div>
         </div>
+        {syncWarning && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '8px 12px', marginBottom: 8, borderRadius: 6,
+            background: 'rgba(154,74,74,0.1)', border: '1px solid rgba(154,74,74,0.3)',
+          }}>
+            <span style={{ fontSize: 13, color: '#c47070' }}>⚠</span>
+            <span style={{ fontSize: 11, color: '#c47070', flex: 1 }}>{syncWarning}</span>
+            <button onClick={() => setSyncWarning(null)} style={{
+              background: 'none', border: 'none', color: '#8C6A3E', cursor: 'pointer', fontSize: 13, lineHeight: 1,
+            }}>✕</button>
+          </div>
+        )}
         {transactions.slice(0, 8).map(tx => <TxRow key={tx.id} tx={tx} {...txRowProps} />)}
       </DashCard>
 

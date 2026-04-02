@@ -1,4 +1,4 @@
-const BASE_URL = 'http://localhost:8080'
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 
 export interface App {
   id: string
@@ -27,31 +27,37 @@ export interface AppsSummary {
   uptime: number
 }
 
-const MOCK_CONNECTED: App[] = [
-  { id: 'gmail',    name: 'Gmail',           description: 'Email & inbox',       category: 'productivity', status: 'connected', meta: '342 emails processed today', usage: 72, color: '#c47070', icon: '✉' },
-  { id: 'gcal',     name: 'Google Calendar', description: 'Events & scheduling', category: 'productivity', status: 'connected', meta: '8 events this week',         usage: 45, color: '#6a9ab0', icon: '◷' },
-  { id: 'finance',  name: 'Finance',         description: 'Banking & expenses',  category: 'finance',      status: 'expiring',  meta: 'Token expires in 2h',        usage: 88, color: '#C6A15B', icon: '$' },
-  { id: 'slack',    name: 'Slack',           description: 'Team messaging',      category: 'communication',status: 'error',     meta: 'Authentication error',       usage: 0,  color: '#9a4a4a', icon: '#' },
-]
+function authHeaders(): Record<string, string> {
+  const token = localStorage.getItem('token')
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
 
-const MOCK_AVAILABLE: App[] = [
-  { id: 'gdrive', name: 'Google Drive', description: 'Files & documents', category: 'productivity', status: 'disconnected', meta: '', usage: 0, color: '#4a9a59', icon: '▶' },
-  { id: 'notion', name: 'Notion',       description: 'Notes & wikis',     category: 'productivity', status: 'disconnected', meta: '', usage: 0, color: '#6a9ab0', icon: '☁' },
-]
+async function get<T>(path: string): Promise<T> {
+  const res = await fetch(`${BASE_URL}${path}`, { headers: authHeaders() })
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+  return res.json()
+}
 
-const MOCK_ACTIVITY: ActivityLog[] = [
-  { id: '1', app: 'Gmail',    message: '12 new emails processed',   time: '14:32', type: 'success' },
-  { id: '2', app: 'Calendar', message: 'Meeting reminder sent',     time: '13:15', type: 'info'    },
-  { id: '3', app: 'Slack',    message: 'Authentication failed',     time: '12:48', type: 'error'   },
-  { id: '4', app: 'Finance',  message: 'Token renewal needed',      time: '11:20', type: 'warning' },
-  { id: '5', app: 'Gmail',    message: 'Daily summary generated',   time: '09:00', type: 'success' },
-]
+async function del(path: string): Promise<void> {
+  const res = await fetch(`${BASE_URL}${path}`, { method: 'DELETE', headers: authHeaders() })
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+}
 
-export const getConnectedApps  = async (): Promise<App[]>          => { await new Promise(r => setTimeout(r, 300)); return MOCK_CONNECTED }
-export const getAvailableApps  = async (): Promise<App[]>          => { await new Promise(r => setTimeout(r, 300)); return MOCK_AVAILABLE }
-export const getActivityLog    = async (): Promise<ActivityLog[]>  => { await new Promise(r => setTimeout(r, 300)); return MOCK_ACTIVITY }
-export const getAppsSummary    = async (): Promise<AppsSummary>    => { await new Promise(r => setTimeout(r, 300)); return { connected: 4, available: 2, errors: 1, uptime: 98 } }
+async function post(path: string): Promise<void> {
+  const res = await fetch(`${BASE_URL}${path}`, { method: 'POST', headers: authHeaders() })
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+}
 
-export const connectApp    = async (appId: string): Promise<void> => { await new Promise(r => setTimeout(r, 500)); console.log('connect', appId) }
-export const disconnectApp = async (appId: string): Promise<void> => { await new Promise(r => setTimeout(r, 500)); console.log('disconnect', appId) }
-export const renewToken    = async (appId: string): Promise<void> => { await new Promise(r => setTimeout(r, 500)); console.log('renew', appId) }
+export const getConnectedApps  = (): Promise<App[]>         => get('/api/apps/connected')
+export const getAvailableApps  = (): Promise<App[]>         => get('/api/apps/available')
+export const getActivityLog    = (): Promise<ActivityLog[]> => get('/api/apps/activity')
+export const getAppsSummary    = (): Promise<AppsSummary>   => get('/api/apps/summary')
+
+export const connectApp    = (_appId: string): Promise<void> => {
+  // OAuth flow — redirect browser through auth-service
+  window.location.href = `${BASE_URL}/oauth2/authorization/${_appId}`
+  return Promise.resolve()
+}
+
+export const disconnectApp = (appId: string): Promise<void> => del(`/api/apps/${appId}/disconnect`)
+export const renewToken    = (appId: string): Promise<void> => post(`/api/apps/${appId}/renew`)

@@ -2,7 +2,9 @@
 
 package com.authorizedact.auth_service.infrastructure.security;
 
+import com.authorizedact.auth_service.domain.entities.AppActivityLog;
 import com.authorizedact.auth_service.domain.entities.User;
+import com.authorizedact.auth_service.domain.repositories.AppActivityLogRepository;
 import com.authorizedact.auth_service.domain.repositories.UserRepository;
 import com.authorizedact.auth_service.features.oauth.OAuthDataSynchronizer;
 import jakarta.servlet.ServletException;
@@ -29,15 +31,17 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
     private final UserRepository userRepository;
     private final OAuth2AuthorizedClientService authorizedClientService;
     private final OAuthDataSynchronizer oAuthDataSynchronizer;
+    private final AppActivityLogRepository activityLogRepository;
 
     @Value("${app.frontend-url}")
     private String frontendUrl;
 
-    public OAuth2AuthenticationSuccessHandler(JwtService jwtService, UserRepository userRepository, OAuth2AuthorizedClientService authorizedClientService, OAuthDataSynchronizer oAuthDataSynchronizer) {
+    public OAuth2AuthenticationSuccessHandler(JwtService jwtService, UserRepository userRepository, OAuth2AuthorizedClientService authorizedClientService, OAuthDataSynchronizer oAuthDataSynchronizer, AppActivityLogRepository activityLogRepository) {
         this.jwtService = jwtService;
         this.userRepository = userRepository;
         this.authorizedClientService = authorizedClientService;
         this.oAuthDataSynchronizer = oAuthDataSynchronizer;
+        this.activityLogRepository = activityLogRepository;
     }
 
     @Override
@@ -114,6 +118,14 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
             );
             // ----------------------------------------------------------------------------------------------------
 
+            // Registrar actividad de conexión
+            AppActivityLog activityLog = new AppActivityLog();
+            activityLog.setUser(user);
+            activityLog.setAppName(capitalize(providerName));
+            activityLog.setMessage(refreshToken != null ? "Connected via OAuth · refresh token saved" : "Connected via OAuth");
+            activityLog.setType("success");
+            activityLogRepository.save(activityLog);
+
             // Generar Token JWT
             String token = jwtService.generateToken(user);
             System.out.println("JWT generated successfully for user ID: " + user.getId());
@@ -136,5 +148,10 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
                     .build().toUriString();
             getRedirectStrategy().sendRedirect(request, response, errorUrl);
         }
+    }
+
+    private String capitalize(String s) {
+        if (s == null || s.isEmpty()) return s;
+        return Character.toUpperCase(s.charAt(0)) + s.substring(1);
     }
 }

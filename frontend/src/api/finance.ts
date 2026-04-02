@@ -134,13 +134,19 @@ export const getTransactions = async (): Promise<Transaction[]> => {
   }
 }
 
-export const syncTransactions = async (): Promise<Transaction[]> => {
+export interface SyncResult {
+  transactions: Transaction[]
+  warning: string | null
+}
+
+export const syncTransactions = async (): Promise<SyncResult> => {
   try {
     const res = await fetch(`${IA_URL}/finance/sync`, { method: 'POST', headers: authHeaders() })
     if (!res.ok) throw new Error('Sync error')
-    return _mapTransactions(await res.json())
+    const data = await res.json()
+    return { transactions: _mapTransactions(data), warning: data.sync_warning ?? null }
   } catch {
-    return MOCK_TRANSACTIONS
+    return { transactions: MOCK_TRANSACTIONS, warning: 'Could not reach the sync service.' }
   }
 }
 
