@@ -42,7 +42,7 @@ func (s *GmailService) SyncEmails(ctx context.Context, userID string) (int, erro
 	log.Println("Gmail client obtenido exitosamente")
 
 	user := "me"
-	listRes, err := client.Users.Messages.List(user).MaxResults(10).Do()
+	listRes, err := client.Users.Messages.List(user).MaxResults(50).Do()
 	if err != nil {
 		log.Printf("Error al listar mensajes de gmail: %v", err)
 		return 0, err
@@ -97,19 +97,26 @@ func (s *GmailService) SendEmail(ctx context.Context, req domain.EmailRequest) e
 func (s *GmailService) getGmailClient(ctx context.Context, userID string) (*gmail.Service, error) {
 	accessToken, refreshToken, err := s.repo.GetOAuthTokens(userID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("tokens no encontrados para user %s: %w", userID, err)
+	}
+	if refreshToken == "" {
+		return nil, fmt.Errorf("refresh_token vacío para user %s: el usuario debe reconectar su cuenta Google", userID)
 	}
 
 	conf := &oauth2.Config{
 		ClientID:     s.config.GoogleClientID,
 		ClientSecret: s.config.GoogleClientSecret,
+		Scopes:       []string{"https://www.googleapis.com/auth/gmail.readonly"},
 		Endpoint:     google.Endpoint,
 	}
 
+	// Sin Expiry almacenado en DB, marcamos el token como expirado para que
+	// la librería oauth2 siempre use el refresh_token y obtenga un access_token fresco.
 	token := &oauth2.Token{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 		TokenType:    "Bearer",
+		Expiry:       time.Now().Add(-time.Second),
 	}
 
 	tokenSource := conf.TokenSource(ctx, token)

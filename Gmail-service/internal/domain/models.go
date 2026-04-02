@@ -1,4 +1,4 @@
-git branch -D Nicopackage domain
+package domain
 
 import "time"
 
