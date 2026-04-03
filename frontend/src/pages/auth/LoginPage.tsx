@@ -106,10 +106,10 @@ export default function LoginPage() {
         <OrDivider />
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <SocialButton icon={<GoogleIcon />}   label="Continue with Google"   onClick={() => window.location.href = 'http://localhost:8080/oauth2/authorization/google'} />
-          <SocialButton icon={<LinkedInIcon />} label="Continue with Linkedin" onClick={() => window.location.href = 'http://localhost:8080/oauth2/authorization/linkedin'} />
-          <SocialButton icon={<GithubIcon />}   label="Continue with Github"   onClick={() => window.location.href = 'http://localhost:8080/oauth2/authorization/github'} />
-          <SocialButton icon={<FacebookIcon />} label="Continue with Facebook" onClick={() => window.location.href = 'http://localhost:8080/oauth2/authorization/facebook'} />
+          <SocialButton icon={<GoogleIcon />}   label="Continue with Google"   onClick={() => window.location.href = `${import.meta.env.VITE_API_URL ?? 'http://localhost:8080'}/oauth2/authorization/google`} />
+          <SocialButton icon={<LinkedInIcon />} label="Continue with Linkedin" onClick={() => window.location.href = `${import.meta.env.VITE_API_URL ?? 'http://localhost:8080'}/oauth2/authorization/linkedin`} />
+          <SocialButton icon={<GithubIcon />}   label="Continue with Github"   onClick={() => window.location.href = `${import.meta.env.VITE_API_URL ?? 'http://localhost:8080'}/oauth2/authorization/github`} />
+          <SocialButton icon={<FacebookIcon />} label="Continue with Facebook" onClick={() => window.location.href = `${import.meta.env.VITE_API_URL ?? 'http://localhost:8080'}/oauth2/authorization/facebook`} />
         </div>
       </form>
     </AuthCard>

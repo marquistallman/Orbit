@@ -3,6 +3,10 @@ FROM node:22 AS builder
 WORKDIR /app
 ARG VITE_MINI_MAPS_URL
 ENV VITE_MINI_MAPS_URL=$VITE_MINI_MAPS_URL
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
+ARG VITE_IA_URL
+ENV VITE_IA_URL=$VITE_IA_URL
 # Copy package files
 COPY package.json package-lock.json ./
 # Install dependencies

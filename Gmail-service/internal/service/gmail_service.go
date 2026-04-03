@@ -106,7 +106,7 @@ func (s *GmailService) getGmailClient(ctx context.Context, userID string) (*gmai
 	conf := &oauth2.Config{
 		ClientID:     s.config.GoogleClientID,
 		ClientSecret: s.config.GoogleClientSecret,
-		Scopes:       []string{"https://www.googleapis.com/auth/gmail.readonly"},
+		Scopes:       []string{"https://www.googleapis.com/auth/gmail.readonly", "https://www.googleapis.com/auth/gmail.send"},
 		Endpoint:     google.Endpoint,
 	}
 

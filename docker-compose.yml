@@ -49,10 +49,12 @@ services:
       - RATE_LIMIT_MULTIPLIER_AGENT_RUN=${RATE_LIMIT_MULTIPLIER_AGENT_RUN:-1.0}
       - RATE_LIMIT_MULTIPLIER_AGENT_ACTION=${RATE_LIMIT_MULTIPLIER_AGENT_ACTION:-0.7}
       - RATE_LIMIT_MULTIPLIER_AGENT_TOOL=${RATE_LIMIT_MULTIPLIER_AGENT_TOOL:-0.6}
+      - GMAIL_SERVICE_URL=http://gmail-service:8082
     networks:
       - orbit-network
     depends_on:
       - redis
+      - gmail-service
     # Forzamos a FastAPI a escuchar en 0.0.0.0 para que sea accesible desde fuera
     command: uvicorn main:app --host 0.0.0.0 --port 5000
   redis:
@@ -153,6 +155,8 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_MINI_MAPS_URL: http://localhost:9005
+        VITE_API_URL: http://localhost:8081
+        VITE_IA_URL: http://localhost:5000
     ports:
       - "5173:80"
     depends_on:

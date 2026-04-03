@@ -15,7 +15,9 @@ from tools.tool_executor import execute_tool
 from utils.logger import logger
 
 import re
+import html as _html
 import requests as _requests
+from datetime import timezone, timedelta
 
 router = APIRouter()
 
@@ -568,3 +570,119 @@ def get_usage(request: Request):
         "estimated_cost_usd": usage["estimated_cost_usd"],
         "remaining":         limits["remaining"],
     }
+
+
+# ── Messages ──────────────────────────────────────────────────────────────────
+
+class SendMessageRequest(BaseModel):
+    to: str
+    subject: str = ""
+    body: str
+
+
+def _parse_sender(raw: str) -> tuple[str, str]:
+    """Parse 'Name <email>' or plain email into (display_name, email)."""
+    m = re.match(r'^(.*?)\s*<([^>]+)>', raw.strip())
+    if m:
+        name = m.group(1).strip().strip('"')
+        addr = m.group(2).strip()
+        return name or addr, addr
+    addr = raw.strip()
+    return addr, addr
+
+
+def _strip_html(html_content: str) -> str:
+    """Strip HTML tags and decode entities to plain text."""
+    clean = re.sub(r'<(script|style)[^>]*>.*?</(script|style)>', '', html_content,
+                   flags=re.DOTALL | re.IGNORECASE)
+    clean = re.sub(r'<br\s*/?>', '\n', clean, flags=re.IGNORECASE)
+    clean = re.sub(r'<[^>]+>', ' ', clean)
+    clean = _html.unescape(clean)
+    clean = re.sub(r'[ \t]+', ' ', clean)
+    clean = re.sub(r'\n{3,}', '\n\n', clean)
+    return clean.strip()
+
+
+def _format_email_date(received_at: str) -> str:
+    """Return 'Hoy, HH:MM', 'Ayer', or 'DD Mon'."""
+    MONTHS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+    try:
+        dt = datetime.fromisoformat(received_at.replace('Z', '+00:00'))
+        now = datetime.now(timezone.utc)
+        dt_utc = dt.astimezone(timezone.utc)
+        today = now.date()
+        if dt_utc.date() == today:
+            return f"Hoy, {dt_utc.strftime('%H:%M')}"
+        if dt_utc.date() == (now - timedelta(days=1)).date():
+            return "Ayer"
+        return f"{dt_utc.day} {MONTHS[dt_utc.month - 1]}"
+    except Exception:
+        return received_at or ""
+
+
+_URGENT_KEYWORDS = ["urgent", "urgente", "asap", "critical", "crítico",
+                    "importante", "important", "action required", "acción requerida"]
+
+
+@router.get("/messages")
+def get_messages(request: Request):
+    token   = request.headers.get("Authorization")
+    user_id = request.headers.get("X-User-Id") or resolve_user_id(token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="user_id required")
+
+    try:
+        resp = _requests.get(
+            f"{GMAIL_SERVICE_URL}/emails",
+            params={"userId": user_id},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        emails = resp.json() or []
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Gmail service error: {str(e)}")
+
+    messages = []
+    for email in emails:
+        from_name, from_email = _parse_sender(email.get("sender", ""))
+        body_text = (email.get("bodyText") or "").strip()
+        body_html = email.get("bodyHtml") or ""
+        body      = body_text if body_text else _strip_html(body_html)
+        subject   = email.get("subject") or "(Sin asunto)"
+        preview   = (email.get("snippet") or body)[:120]
+        is_urgent = any(k in (subject + " " + preview).lower() for k in _URGENT_KEYWORDS)
+
+        messages.append({
+            "id":      email.get("id", ""),
+            "from":    from_name,
+            "email":   from_email,
+            "subject": subject,
+            "preview": preview,
+            "body":    body[:8000],
+            "date":    _format_email_date(email.get("receivedAt", "")),
+            "source":  "gmail",
+            "read":    False,
+            "urgent":  is_urgent,
+        })
+
+    return {"messages": messages, "total": len(messages)}
+
+
+@router.post("/messages/send")
+def send_message(request: Request, payload: SendMessageRequest):
+    token   = request.headers.get("Authorization")
+    user_id = request.headers.get("X-User-Id") or resolve_user_id(token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="user_id required")
+
+    try:
+        resp = _requests.post(
+            f"{GMAIL_SERVICE_URL}/emails/send",
+            json={"userId": user_id, "to": payload.to,
+                  "subject": payload.subject, "body": payload.body},
+            timeout=15,
+        )
+        resp.raise_for_status()
+        return {"status": "sent"}
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Gmail send error: {str(e)}")
