@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import DashCard from '../../components/ui/DashCard'
-import { getMessages, summarizeMessage, suggestReply, type Message } from '../../api/messages'
+import { getMessages, summarizeMessage, suggestReply, sendReply, type Message } from '../../api/messages'
 
 const SOURCE_COLORS: Record<string, string> = {
   gmail: '#c47070',
@@ -26,12 +26,23 @@ export default function MessagesPage() {
   const [messages, setMessages]         = useState<Message[]>([])
   const [selected, setSelected]         = useState<Message | null>(null)
   const [filter, setFilter]             = useState<'all' | 'unread' | 'urgent'>('all')
-  const [source, setSource]             = useState<'all' | 'gmail' | 'slack'>('all')
+  const [source, setSource]             = useState<'all' | 'gmail'>('all')
   const [loading, setLoading]           = useState(true)
   const [summary, setSummary]           = useState('')
   const [summaryLoading, setSummaryLoading] = useState(false)
   const [replyLoading, setReplyLoading] = useState(false)
   const [replyText, setReplyText]       = useState('')
+  const [sending,   setSending]         = useState(false)
+  const [sent,      setSent]            = useState(false)
+  const [sendError, setSendError]       = useState<string | null>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    const el = textareaRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = el.scrollHeight + 'px'
+  }, [replyText])
 
   useEffect(() => {
     getMessages().then(msgs => {
@@ -45,7 +56,8 @@ export default function MessagesPage() {
     setSelected(msg)
     setSummary('')
     setReplyText('')
-    setReplyText('')
+    setSent(false)
+    setSendError(null)
     // Mark as read
     setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, read: true } : m))
   }
@@ -56,6 +68,23 @@ export default function MessagesPage() {
     const s = await summarizeMessage(selected.id, selected.body)
     setSummary(s)
     setSummaryLoading(false)
+  }
+
+  const handleSend = async () => {
+    if (!selected || !replyText.trim()) return
+    setSending(true)
+    setSent(false)
+    setSendError(null)
+    try {
+      await sendReply(selected.email, `Re: ${selected.subject}`, replyText)
+      setReplyText('')
+      setSent(true)
+      setTimeout(() => setSent(false), 3000)
+    } catch (e: unknown) {
+      setSendError(e instanceof Error ? e.message : 'Error al enviar')
+    } finally {
+      setSending(false)
+    }
   }
 
   const handleSuggestReply = async () => {
@@ -118,15 +147,15 @@ export default function MessagesPage() {
 
           {/* Source filters */}
           <div style={{ display: 'flex', gap: 5 }}>
-            {(['all', 'gmail', 'slack'] as const).map(s => (
+            {(['all', 'gmail'] as const).map(s => (
               <button key={s} onClick={() => setSource(s)} style={{
                 fontSize: 9, padding: '2px 8px', borderRadius: 10, cursor: 'pointer',
                 fontFamily: 'inherit',
-                border: source === s ? `1px solid ${s === 'gmail' ? '#c47070' : s === 'slack' ? '#6a9ab0' : '#C6A15B'}` : '1px solid rgba(198,161,91,0.12)',
+                border: source === s ? `1px solid ${s === 'gmail' ? '#c47070' : '#C6A15B'}` : '1px solid rgba(198,161,91,0.12)',
                 background: 'transparent',
-                color: source === s ? (s === 'gmail' ? '#c47070' : s === 'slack' ? '#6a9ab0' : '#C6A15B') : '#8C6A3E',
+                color: source === s ? (s === 'gmail' ? '#c47070' : '#C6A15B') : '#8C6A3E',
               }}>
-                {s === 'all' ? '● All' : s === 'gmail' ? '● Gmail' : '● Slack'}
+                {s === 'all' ? '● All' : '● Gmail'}
               </button>
             ))}
           </div>
@@ -258,27 +287,33 @@ export default function MessagesPage() {
           {/* Reply box */}
           <DashCard style={{ padding: '12px 16px', flexShrink: 0 }} speed={0.0003}>
             {replyLoading && <PulseLoader />}
-            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
-              <textarea
-                value={replyText}
-                onChange={e => setReplyText(e.target.value)}
-                placeholder="Write a reply..."
-                style={{
-                  flex: 1, background: '#1B1B1B',
-                  border: '1px solid rgba(198,161,91,0.2)',
-                  borderRadius: 6, padding: '9px 12px',
-                  fontSize: 12, color: '#EDE6D6',
-                  fontFamily: 'inherit', resize: 'none', height: 56,
-                  outline: 'none', lineHeight: 1.5,
-                }}
-              />
-              <button style={{
-                background: '#C6A15B', border: 'none', borderRadius: 6,
-                padding: '8px 18px', fontSize: 12, fontWeight: 600,
-                color: '#1B1B1B', cursor: 'pointer', fontFamily: 'inherit',
-                height: 56, flexShrink: 0,
+            <textarea
+              ref={textareaRef}
+              value={replyText}
+              onChange={e => setReplyText(e.target.value)}
+              placeholder="Write a reply..."
+              style={{
+                width: '100%', background: '#1B1B1B',
+                border: '1px solid rgba(198,161,91,0.2)',
+                borderRadius: 6, padding: '9px 12px',
+                fontSize: 12, color: '#EDE6D6',
+                fontFamily: 'inherit', resize: 'none',
+                minHeight: 80, height: 'auto', outline: 'none', lineHeight: 1.6,
+                boxSizing: 'border-box', overflow: 'hidden',
+              }}
+            />
+            {sendError && (
+              <div style={{ fontSize: 11, color: '#c47070', marginTop: 6 }}>⚠ {sendError}</div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+              <button onClick={handleSend} disabled={sending || !replyText.trim()} style={{
+                background: sent ? '#4a9a59' : '#C6A15B', border: 'none', borderRadius: 6,
+                padding: '7px 20px', fontSize: 12, fontWeight: 600,
+                color: '#1B1B1B', cursor: sending || !replyText.trim() ? 'not-allowed' : 'pointer',
+                fontFamily: 'inherit', opacity: sending || !replyText.trim() ? 0.7 : 1,
+                transition: 'background 0.3s',
               }}>
-                Enviar
+                {sent ? '✓ Enviado' : sending ? 'Enviando...' : 'Enviar'}
               </button>
             </div>
           </DashCard>

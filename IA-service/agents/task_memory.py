@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 tasks = {}
 
@@ -11,7 +11,7 @@ def create_task(task_text):
         "task": task_text,
         "status": "running",
         "result": None,
-        "created_at": datetime.utcnow().isoformat()
+        "created_at": datetime.now(timezone.utc).isoformat()
     }
 
     return task_id

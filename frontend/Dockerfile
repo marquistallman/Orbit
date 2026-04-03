@@ -1,10 +1,14 @@
 # Stage 1: Build the React application
 FROM node:22 AS builder
 WORKDIR /app
-
+ARG VITE_MINI_MAPS_URL
+ENV VITE_MINI_MAPS_URL=$VITE_MINI_MAPS_URL
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
+ARG VITE_IA_URL
+ENV VITE_IA_URL=$VITE_IA_URL
 # Copy package files
 COPY package.json package-lock.json ./
-
 # Install dependencies
 RUN npm ci
 # Fix rollup optional dependency bug
@@ -19,5 +23,6 @@ FROM nginx:stable-alpine
 RUN rm /etc/nginx/conf.d/default.conf
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/dist /usr/share/nginx/html
+
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]

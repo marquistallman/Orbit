@@ -48,13 +48,15 @@ public class SecurityConfig {
                 .requestMatchers(
                     "/", 
                     "/index.html", 
+                    "/actuator/health",
+                    "/actuator/prometheus",
                     "/api/auth/login", 
                     "/api/auth/register", 
                     "/api/auth/recover/**",
                     "/oauth2/**", 
                     "/login/oauth2/code/*"
                 ).permitAll()
-                .requestMatchers("/api/profile/me", "/api/auth/me").authenticated()
+                .requestMatchers("/api/profile/me", "/api/auth/me", "/api/apps/**", "/api/connections/**").authenticated()
             )
             .oauth2Login(oauth2 -> oauth2
                 .successHandler(oAuth2AuthenticationSuccessHandler)

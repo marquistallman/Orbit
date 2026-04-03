@@ -2,8 +2,10 @@ import logging
 # Configuración básica para asegurar que los logs salgan a stdout inmediatamente
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from ai.security_observability import prometheus_metrics_response
 from routes.agent_routes import router as agent_router
 
 app = FastAPI(
@@ -11,15 +13,15 @@ app = FastAPI(
     version="1.0"
 )
 
-# Orígenes permitidos (tu frontend)
-origins = [
-    "http://localhost:5173",
-]
+# Comma-separated list for production domains, fallback to localhost for dev.
+raw_origins = os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173")
+origins = [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
+allow_credentials = os.getenv("CORS_ALLOW_CREDENTIALS", "true").lower() in ("1", "true", "yes", "on")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_credentials=True,
+    allow_credentials=allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -33,4 +35,4 @@ def health_check():
 # Endpoint para evitar 404 de Prometheus
 @app.get("/metrics")
 def metrics():
-    return {"status": "ok"}
+    return prometheus_metrics_response()

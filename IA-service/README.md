@@ -5,11 +5,57 @@ Servicio de IA backend para el proyecto Orbit, construido con FastAPI. Proporcio
 ## Características
 
 - 🤖 **Agente de IA integrado**: Orquestación automática de tareas con selección inteligente de herramientas.
-- 🛠️ **Múltiples herramientas**: Generación de emails, análisis financiero, edición de documentos, integración con microservicios.
+- 🛠️ **Múltiples herramientas**: Generación de emails, análisis financiero, documentos, Excel, mini maps y ejecución de código mediante microservicios.
+- 🧠 **Memoria persistente por usuario**: Guarda preferencias e información contextual (por ejemplo idioma y personas relevantes) en SQLite.
+- 💸 **Control de costos por plan**: Plan `free` por defecto con límites mensuales de prompts/tokens y métricas de consumo por usuario.
 - 📝 **API tipada con Pydantic**: Validación automática de entrada/salida, documentación OpenAPI.
-- 🧪 **Tests unitarios**: 12+ tests con pytest + TestClient para validar contratos API.
+- 🧪 **Tests unitarios**: 14+ tests con pytest + TestClient para validar contratos API.
 - 🔒 **Robustez de red**: Timeouts configurables, validación HTTP, manejo de errores resiliente.
 - 🐳 **Docker-ready**: Dockerfile optimizado y docker-compose con variables de entorno.
+
+## Novedades de seguridad y observabilidad (Fase 2/3)
+
+- **Rate limit distribuido** con backend Redis (fallback automatico a memoria si Redis no esta disponible).
+- **Endurecimiento adaptativo**: al detectar abuso repetido, reduce temporalmente el limite efectivo y aplica cooldown progresivo.
+- **Headers de control** en respuestas de endpoints protegidos:
+  - `X-RateLimit-Limit`
+  - `X-RateLimit-Limit-Base`
+  - `X-RateLimit-Remaining`
+  - `X-RateLimit-Reset`
+  - `X-RateLimit-Adaptive`
+  - `Retry-After` (cuando retorna `429`).
+- **Validacion estricta de entrada** en payloads y user identifiers.
+- **Metricas Prometheus reales** expuestas en `GET /metrics` (formato OpenMetrics), incluyendo:
+  - `orbit_rate_limit_checks_total`
+  - `orbit_rate_limit_throttles_total`
+  - `orbit_rate_limit_retry_after_seconds`
+  - `orbit_rate_limit_effective_limit`
+  - `orbit_rate_limit_adaptive_tightening`
+  - `orbit_rate_limit_adaptive_tightening_events_total`
+- **Logging estructurado de seguridad** para eventos de bloqueo y adaptacion.
+
+## Variables de entorno recomendadas (rate limit y metricas)
+
+Adicionales a las variables base ya existentes:
+
+```
+RATE_LIMIT_BACKEND=redis
+RATE_LIMIT_REDIS_URL=redis://redis:6379/0
+RATE_LIMIT_REDIS_PREFIX=orbit
+RATE_LIMIT_MULTIPLIER_AGENT_RUN=1.0
+RATE_LIMIT_MULTIPLIER_AGENT_ACTION=0.7
+RATE_LIMIT_MULTIPLIER_AGENT_TOOL=0.6
+SECURITY_METRICS_ENABLED=true
+```
+
+Notas:
+
+- Si `RATE_LIMIT_BACKEND=redis` y Redis no responde, el servicio cae de forma segura a limiter en memoria.
+- En despliegues con varias replicas, se recomienda Redis para consistencia entre instancias.
+
+## Documentación adicional
+
+- Perfiles de costos y planes (Free/Lite/Standard/Pro): [README_COST_PROFILES.md](README_COST_PROFILES.md)
 
 ## Requisitos
 
@@ -25,6 +71,9 @@ Servicio de IA backend para el proyecto Orbit, construido con FastAPI. Proporcio
    OPENROUTER_API_KEY=sk-or-v1-xxxx...
    OPENROUTER_MODEL=openai/gpt-4o-mini
    HTTP_TIMEOUT_SECONDS=20
+  MEMORY_DB_PATH=/data/agent_memory.db
+  USAGE_DB_PATH=/data/usage.db
+  DEFAULT_PLAN=free
    JWT_SECRET=your-secret-key-change-in-production
    ```
 
@@ -33,9 +82,7 @@ Servicio de IA backend para el proyecto Orbit, construido con FastAPI. Proporcio
    docker-compose up --build
    ```
 
-El servidor estará disponible en http://localhost:8000
-
-Para desarrollo con recarga automática, el compose ya deja `--reload` habilitado.
+El servidor estará disponible en http://localhost:5000
 
 ## Ejecución sin Docker (Entorno Virtual)
 
@@ -63,10 +110,10 @@ Para desarrollo con recarga automática, el compose ya deja `--reload` habilitad
 ### Ejecución
 
 ```
-uvicorn main:app --reload --port 8000
+uvicorn main:app --reload --port 5000
 ```
 
-El servidor estará disponible en http://localhost:8000
+El servidor estará disponible en http://localhost:5000
 
 ## Tests
 
@@ -84,7 +131,7 @@ Los tests validan:
 - ✅ Estructura de respuestas (response models)
 - ✅ Manejo de errores
 
-Resultado esperado: **12/12 tests PASSING** ✅
+Resultado esperado: **14/14 tests PASSING** ✅
 
 ### Pruebas Manuales (Testing Manual)
 
@@ -95,7 +142,7 @@ Resultado esperado: **12/12 tests PASSING** ✅
    docker-compose up --build
    ```
 
-2. Abre en tu navegador: **http://localhost:8000/docs**
+2. Abre en tu navegador: **http://localhost:5000/docs**
 
 3. Verás Swagger UI donde puedes probar todos los endpoints interactivamente.
 
@@ -107,7 +154,7 @@ $body = @{
     task = "write a professional email to my boss about Q1 results"
 } | ConvertTo-Json
 
-Invoke-RestMethod -Uri "http://localhost:8000/agent/run" `
+Invoke-RestMethod -Uri "http://localhost:5000/agent/run" `
   -Method Post `
   -Headers @{"Content-Type"="application/json"} `
   -Body $body
@@ -119,7 +166,7 @@ $body = @{
     task = "analyze my investment portfolio performance for tech stocks in the last quarter and give recommendations"
 } | ConvertTo-Json
 
-Invoke-RestMethod -Uri "http://localhost:8000/agent/run" `
+Invoke-RestMethod -Uri "http://localhost:5000/agent/run" `
   -Method Post `
   -Headers @{"Content-Type"="application/json"} `
   -Body $body
@@ -131,7 +178,7 @@ $body = @{
     task = "create a comprehensive python project structure for a web scraper with best practices"
 } | ConvertTo-Json
 
-Invoke-RestMethod -Uri "http://localhost:8000/agent/run" `
+Invoke-RestMethod -Uri "http://localhost:5000/agent/run" `
   -Method Post `
   -Headers @{"Content-Type"="application/json"} `
   -Body $body
@@ -154,7 +201,7 @@ Invoke-RestMethod -Uri "http://localhost:8000/agent/run" `
 #### Opción 3: Herramientas GUI
 
 Usa **Postman** o **Insomnia** (apps de desktop):
-- **URL:** `POST http://localhost:8000/agent/run`
+- **URL:** `POST http://localhost:5000/agent/run`
 - **Headers:** `Content-Type: application/json`
 - **Body (JSON):**
   ```json
@@ -172,12 +219,14 @@ El agente se adapta automáticamente según palabras clave en la tarea:
 | email, gmail, write | "write an email about..." | `email_generate` |
 | finance, investment, portfolio, stock | "analyze my stocks..." | `finance_analysis` |
 | document, edit, file | "create a document..." | `document_edit` |
+| excel, spreadsheet, xlsx | "create a spreadsheet..." | `excel_edit` |
+| mini map, map, route, location | "build a map for delivery points" | `mini_maps` |
 | code, script, program | "write a python script..." | `code_run` |
 | (ninguna) | "general question or task" | Consulta solo el LLM |
 
 ## Documentación de la API
 
-La documentación interactiva OpenAPI está disponible en: **http://localhost:8000/docs**
+La documentación interactiva OpenAPI está disponible en: **http://localhost:5000/docs**
 
 ### Endpoints principales
 
@@ -203,6 +252,10 @@ Ejecuta una tarea con el agente de IA.
 }
 ```
 
+Notas de memoria automática:
+- Si el usuario escribe instrucciones como "siempre háblame en español", el agente las recuerda para próximos mensajes.
+- Si menciona relaciones como "mi jefe Carlos" o compañeros de proyecto, se almacenan como contexto reutilizable.
+
 #### GET `/agent/tools`
 Lista todas las herramientas disponibles.
 
@@ -213,8 +266,28 @@ Lista todas las herramientas disponibles.
     "gmail_read": {"description": "...", "endpoint": "..."},
     "email_generate": {"description": "...", "endpoint": "..."},
     "finance_analysis": {"description": "...", "endpoint": "..."},
-    "document_edit": {"description": "...", "endpoint": "..."}
+    "document_edit": {"description": "...", "endpoint": "..."},
+    "excel_edit": {"description": "...", "endpoint": "..."},
+    "code_run": {"description": "...", "endpoint": "..."},
+    "mini_maps": {"description": "...", "endpoint": "..."}
   }
+}
+```
+
+#### POST `/agent/select-tool`
+Devuelve solo el id de la herramienta recomendada para una tarea.
+
+**Request:**
+```json
+{
+  "task": "create a monthly spreadsheet"
+}
+```
+
+**Response (200):**
+```json
+{
+  "tool_id": "excel_edit"
 }
 ```
 
@@ -239,6 +312,18 @@ Ejecuta una herramienta directamente por ID.
   "payload": {"task": "analyze Q4 revenue"}
 }
 ```
+
+#### GET `/agent/memory`
+Lista la memoria persistida del usuario actual.
+
+#### DELETE `/agent/memory`
+Borra la memoria persistida del usuario actual.
+
+#### GET `/agent/plan`
+Devuelve el plan activo del usuario (por defecto `free`) y sus límites.
+
+#### GET `/agent/usage`
+Devuelve consumo mensual estimado por usuario (prompts, tokens de entrada/salida y costo aproximado).
 
 #### GET `/agent/status/{task_id}`
 Obtiene el estado de una tarea.
@@ -277,6 +362,9 @@ Health check del servicio.
 }
 ```
 
+#### GET `/metrics`
+Expone metricas Prometheus para observabilidad y alertas.
+
 ## Estructura del proyecto
 
 ```
@@ -306,9 +394,12 @@ IA-service/
 ├── utils/
 │   └── logger.py               # Logging centralizado
 ├── service/
-│   └── doc-service/main.py     # Microservicio para documentos
+│   ├── doc-service/main.py     # Microservicio Word/PDF + descargas
+│   ├── excel-service/main.py   # Microservicio Excel + descargas
+│   ├── code-service/main.py    # Microservicio de ejecución y snippets de código
+│   └── mini-maps-service/main.py # Microservicio de mini mapas 9x9
 └── tests/
-    ├── test_agent_routes.py    # Suite de tests (12 tests)
+    ├── test_agent_routes.py    # Suite de tests (14 tests)
     └── __init__.py
 ```
 
@@ -351,7 +442,91 @@ JWT_SECRET=your-secret-key-change-in-production  # JWT para auth
 
 # Opcionales
 TOKEN_VAULT_URL=http://localhost:8001            # Servicio de tokens
+GMAIL_SERVICE_URL=http://gmail-service:8082      # URL Gmail service
+DOC_SERVICE_URL=http://doc-service:9002          # URL Doc service
+EXCEL_SERVICE_URL=http://excel-service:9004      # URL Excel service
+CODE_SERVICE_URL=http://code-service:9003        # URL Code service
+MINI_MAPS_SERVICE_URL=http://mini-maps-service:9005 # URL Mini Maps service
+CODE_SNIPPETS_DB_PATH=/data/snippets.db          # SQLite persistente para snippets de code-service
+CODE_PYTHON_ALLOWED_IMPORTS=math,statistics,decimal,datetime,time,json,csv,sqlite3,collections,itertools,functools,fractions,random,re,typing,pathlib,openpyxl
+CODE_JS_ALLOWED_MODULES=
+CODE_PYTHON_BLOCK_PATTERNS=
+CODE_JS_BLOCK_PATTERNS=
+CODE_SQL_BLOCK_PATTERNS=
 ```
+
+## Microservicios específicos
+
+### doc-service (Word/PDF)
+- `POST /edit`: crea archivos `docx`, `pdf` o `both`.
+- `POST /apply-changes`: aplica cambios sobre un archivo existente (`docx` o revisión `pdf`) usando reemplazos y texto adicional.
+- `GET /files/{file_name}`: descarga el archivo generado.
+- Puerto por defecto: `9002`.
+
+### excel-service
+- `POST /edit`: crea un archivo `xlsx` con una o varias hojas.
+- `GET /files/{file_name}`: descarga el archivo generado.
+- Puerto por defecto: `9004`.
+
+### code-service (pequeño editor de código)
+- `POST /run`: ejecuta snippets en `python`, `sql` (SQLite) o `javascript` con timeout.
+- `GET /snippets`: lista snippets en memoria.
+- `POST /snippets`: guarda snippets persistentes en SQLite.
+- `GET /snippets/{id}`: obtiene snippet por id.
+- `DELETE /snippets/{id}`: elimina snippet por id.
+- `PUT /snippets/{id}`: actualiza snippet por id.
+- `DELETE /snippets?confirm=true`: elimina todos los snippets.
+- Límite configurable de memoria por ejecución: `CODE_MAX_MEMORY_MB` (default `128`).
+- Límite configurable de tiempo: `CODE_EXEC_TIMEOUT_SECONDS` (default `5`).
+- Límites adicionales: `CODE_MAX_STDIN_CHARS`, `CODE_MAX_SQL_RESULT_ROWS`, `CODE_MAX_SQL_STATEMENTS`.
+- Seguridad por políticas: `CODE_STRICT_MODE=true` bloquea patrones peligrosos.
+- Allowlist configurable: `CODE_PYTHON_ALLOWED_IMPORTS`, `CODE_JS_ALLOWED_MODULES`.
+- Blocklist configurable: `CODE_PYTHON_BLOCK_PATTERNS`, `CODE_JS_BLOCK_PATTERNS`, `CODE_SQL_BLOCK_PATTERNS`.
+- Persistencia DB configurable: `CODE_SNIPPETS_DB_PATH`.
+- Puerto por defecto: `9003`.
+
+### mini-maps-service
+- `GET /`: UI interactiva con Leaflet para crear marcadores circulares.
+- `GET /api/points`: lista puntos persistidos por `user_id`.
+- `POST /api/points`: crea marcador con `name`, `lat`, `lng`, `color`, `radius`.
+- `PUT /api/points/{point_id}`: edita nombre, color y radio.
+- `DELETE /api/points/{point_id}`: elimina marcador.
+- `POST /map`: endpoint legado compatible con integración por coordenadas `x,y`.
+- Puerto por defecto: `9005`.
+
+### Integración frontend
+- Pantalla de UI: `/app/documents`.
+- Crea documentos y hojas de cálculo desde el frontend.
+- Incluye botones de descarga directa e historial de descargas recientes.
+- El historial persiste en `localStorage` bajo la clave `orbit-docs-recent-downloads` (máximo 12 elementos).
+- Incluye botón **Limpiar historial** para vaciar el historial local y sincronizar `localStorage`.
+- Al limpiar, la UI solicita confirmación (modal) para evitar borrados accidentales.
+- Pantalla de UI para mini maps y editor de código: `/app/labs`.
+
+## Cobertura de issues (#37, #38, #39, #40)
+
+### #37 Word/PDF
+- ✅ Crear documentos Word/PDF.
+- ✅ Descargar archivos generados.
+- ✅ Editar documentos existentes vía `POST /apply-changes` para cambios enviados por IA.
+
+### #38 Mini Maps
+- ✅ Microservicio dedicado con mapa interactivo y marcadores editables.
+- ✅ Persistencia de puntos por usuario (`user_id`).
+- ✅ Exposición por API para consumo desde frontend o agente (incluye endpoint legado).
+
+### #39 Pequeño editor de código
+- ✅ Microservicio independiente con baja interacción con otros servicios.
+- ✅ Dos lenguajes livianos orientados a análisis (`python`, `sql`).
+- ✅ Límite de tiempo por ejecución.
+- ✅ Límite de memoria configurable.
+- ✅ Persistencia real de snippets en DB SQLite.
+
+### #40 Editor Excel
+- ✅ Crear y gestionar workbooks (`POST /edit`).
+- ✅ Análisis básico de datos (`POST /analyze`).
+- ✅ Conversión de Excel a Word (`POST /to-word`).
+- ✅ Descarga de artefactos generados (`GET /files/{file_name}`).
 
 ## Mejoras implementadas (Pasos 1-4)
 
@@ -374,8 +549,17 @@ TOKEN_VAULT_URL=http://localhost:8001            # Servicio de tokens
 
 ### Paso 4: Response models y tests
 - ✅ Response models estándar para todos los endpoints
-- ✅ 12 tests unitarios con pytest
+- ✅ 14 tests unitarios con pytest
 - ✅ Cobertura de validación, códigos HTTP, contratos API
+
+### Paso 5: Capacidades y microservicios
+- ✅ Endpoint `POST /agent/select-tool` para devolver `tool_id`
+- ✅ Registro de tools internas y externas unificado
+- ✅ `document_edit` para Word/PDF
+- ✅ `excel_edit` para generación de Excel
+- ✅ `code_run` para ejecutar snippets controlados
+- ✅ `mini_maps` para generar mini mapas desde coordenadas
+- ✅ Descarga de archivos en `doc-service` y `excel-service`
 
 ## Próximas mejoras opcionales
 
@@ -397,8 +581,8 @@ Aumenta `HTTP_TIMEOUT_SECONDS` en `.env` si los microservicios son lentos.
 ### Error en tests: `ImportError: No module named ...`
 Ejecuta `pip install -r requirements.txt` para instalar dependencias.
 
-### Docker error: `port 8000 already in use`
-Cambia en `docker-compose.yml`: `ports: - "8001:8000"` (mapeo diferente).
+### Docker error: `port 5000 already in use`
+Cambia en `docker-compose.yml`: `ports: - "5001:5000"` (mapeo diferente).
 
 ## Autor
 

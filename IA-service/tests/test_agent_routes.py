@@ -58,6 +58,27 @@ class TestListToolsEndpoint:
         assert "gmail_read" in data["tools"] or len(data["tools"]) >= 0
 
 
+class TestSelectToolEndpoint:
+    """Tests for POST /agent/select-tool endpoint."""
+
+    def test_select_tool_success(self):
+        response = client.post(
+            "/agent/select-tool",
+            json={"task": "write email to customer"}
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert "tool_id" in data
+        assert isinstance(data["tool_id"], str)
+
+    def test_select_tool_validation(self):
+        response = client.post(
+            "/agent/select-tool",
+            json={"task": ""}
+        )
+        assert response.status_code == 422
+
+
 class TestActionEndpoint:
     """Tests for POST /agent/action endpoint."""
 
@@ -122,6 +143,41 @@ class TestToolEndpoint:
         )
         assert response.status_code == 422
 
+    def test_tool_updates_usage(self):
+        user_id = "usage-tool-test-user"
+        before = client.get("/agent/usage", headers={"X-User-Id": user_id}).json()
+        response = client.post(
+            "/agent/tool",
+            json={
+                "tool_id": "finance_analysis",
+                "payload": {"task": "analyze market"}
+            },
+            headers={"X-User-Id": user_id}
+        )
+        assert response.status_code == 200
+        after = client.get("/agent/usage", headers={"X-User-Id": user_id}).json()
+        assert after["prompt_count"] >= before["prompt_count"] + 1
+
+    def test_tool_restricted_by_free_plan(self, monkeypatch):
+        user_id = "restricted-free-user"
+        monkeypatch.setenv("PLAN_FREE_RESTRICTED_TOOLS", "finance_analysis")
+
+        # Ensure this user remains on free for this scenario.
+        from routes import agent_routes
+        agent_routes.usage_store.set_user_plan(user_id, "free")
+
+        response = client.post(
+            "/agent/tool",
+            json={
+                "tool_id": "finance_analysis",
+                "payload": {"task": "analyze market"}
+            },
+            headers={"X-User-Id": user_id}
+        )
+        assert response.status_code == 403
+        body = response.json()
+        assert body["detail"]["error"] == "tool_restricted_by_plan"
+
 
 class TestTaskStatusEndpoint:
     """Tests for GET /agent/status/{task_id} endpoint."""
@@ -144,6 +200,73 @@ class TestTaskHistoryEndpoint:
         data = response.json()
         assert "tasks" in data
         assert isinstance(data["tasks"], list)
+
+
+class TestMemoryEndpoints:
+    """Tests for GET/DELETE /agent/memory endpoint."""
+
+    def test_memory_list_success(self):
+        response = client.get("/agent/memory")
+        assert response.status_code == 200
+        data = response.json()
+        assert "user_id" in data
+        assert "items" in data
+        assert isinstance(data["items"], list)
+
+    def test_memory_clear_success(self):
+        response = client.delete("/agent/memory")
+        assert response.status_code == 200
+        data = response.json()
+        assert "user_id" in data
+        assert "deleted" in data
+        assert isinstance(data["deleted"], int)
+
+
+class TestUsageEndpoints:
+    """Tests for plan and usage endpoints."""
+
+    def test_plan_success(self):
+        response = client.get("/agent/plan")
+        assert response.status_code == 200
+        data = response.json()
+        assert "user_id" in data
+        assert "plan" in data
+        assert "name" in data["plan"]
+
+    def test_usage_success(self):
+        response = client.get("/agent/usage")
+        assert response.status_code == 200
+        data = response.json()
+        assert "user_id" in data
+        assert "plan_name" in data
+        assert "prompt_count" in data
+        assert "remaining" in data
+
+    def test_set_plan_success(self):
+        response = client.post(
+            "/agent/plan",
+            json={"user_id": "plan-test-user", "plan_name": "lite"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["user_id"] == "plan-test-user"
+        assert data["plan"]["name"] == "lite"
+
+    def test_set_plan_invalid(self):
+        response = client.post(
+            "/agent/plan",
+            json={"user_id": "plan-test-user", "plan_name": "ultra"},
+        )
+        assert response.status_code == 400
+        data = response.json()
+        assert data["detail"]["error"] == "invalid_plan"
+
+    def test_require_identity_when_anonymous_disabled(self, monkeypatch):
+        monkeypatch.setenv("ALLOW_ANONYMOUS_USER", "false")
+        response = client.get("/agent/usage")
+        assert response.status_code == 401
+        data = response.json()
+        assert data["detail"]["error"] == "user_identity_required"
 
 
 class TestHealthEndpoint:

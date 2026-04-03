@@ -4,6 +4,8 @@ import { useAuthStore } from '../store/authStore'
 const NAV = [
   { to: '/app/apps',     label: 'Apps'      },
   { to: '/app/agent',    label: 'Agent'     },
+  { to: '/app/documents', label: 'Docs'      },
+  { to: '/app/labs',     label: 'Labs'      },
   { to: '/app/finance',  label: 'Finance'   },
   { to: '/app/messages', label: 'Messages'  },
   { to: '/app',          label: 'Dashboard' },
@@ -46,7 +48,7 @@ export default function AppLayout() {
             fontWeight: 600,
             color: '#C6A15B',
             letterSpacing: 2,
-          }}>rbit</span>
+          }}>Orbit</span>
         </NavLink>
 
         {/* Nav */}
@@ -74,25 +76,44 @@ export default function AppLayout() {
           ))}
         </nav>
 
-        {/* Logout */}
-        <button
-          onClick={handleLogout}
-          style={{
-            background: 'transparent',
-            border: '1px solid rgba(198,161,91,0.4)',
-            borderRadius: 6,
-            padding: '6px 16px',
-            fontSize: 12,
-            fontFamily: "'Questrial', sans-serif",
-            color: '#C6A15B',
-            cursor: 'pointer',
-            transition: 'all 0.15s',
-          }}
-          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(198,161,91,0.1)')}
-          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-        >
-          Log out
-        </button>
+        {/* Account Actions */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <NavLink
+            to="/app/plans"
+            style={({ isActive }) => ({
+              padding: '6px 14px',
+              fontSize: 12,
+              fontWeight: 500,
+              fontFamily: "'Questrial', sans-serif",
+              color: isActive ? '#C6A15B' : '#8C6A3E',
+              textDecoration: 'none',
+              border: isActive ? '1px solid rgba(198,161,91,0.4)' : '1px solid transparent',
+              borderRadius: 6,
+              background: isActive ? 'rgba(198,161,91,0.06)' : 'transparent',
+              transition: 'all 0.15s',
+            })}
+          >
+            Plans
+          </NavLink>
+          <button
+            onClick={handleLogout}
+            style={{
+              background: 'transparent',
+              border: '1px solid rgba(198,161,91,0.4)',
+              borderRadius: 6,
+              padding: '6px 16px',
+              fontSize: 12,
+              fontFamily: "'Questrial', sans-serif",
+              color: '#C6A15B',
+              cursor: 'pointer',
+              transition: 'all 0.15s',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(198,161,91,0.1)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+          >
+            Log out
+          </button>
+        </div>
       </header>
 
       {/* Page */}

@@ -19,7 +19,7 @@ Web interface for the **Orbit AI Operator** system, built with React + Vite + Ty
 - Node.js >= 18
 - npm >= 9
 - Docker Desktop (for PostgreSQL)
-- Auth-service running on `http://localhost:8080`
+- Auth-service running on `http://localhost:8081` (when started with docker-compose)
 
 ---
 
@@ -61,6 +61,14 @@ Open `http://localhost:5173`
 
 ## Implemented features
 
+### Backend Security/Observability Impact
+
+Recent backend hardening updates (distributed rate limit, adaptive cooldowns, Prometheus metrics) do not require mandatory frontend code changes.
+
+- Existing frontend API flows remain valid.
+- No auth UX behavior was changed by these monitoring/security updates.
+- Optional improvement: read `X-RateLimit-*` headers to provide user feedback before receiving `429` responses.
+
 ### Authentication
 - **Login** — form with validation, calls `POST /api/auth/login`
 - **Register** — form with validation, calls `POST /api/auth/register`
@@ -73,10 +81,10 @@ Google, LinkedIn, GitHub and Facebook buttons redirect to the backend to start t
 
 | Button | Endpoint |
 |--------|----------|
-| Google | `http://localhost:8080/oauth2/authorization/google` |
-| LinkedIn | `http://localhost:8080/oauth2/authorization/linkedin` |
-| GitHub | `http://localhost:8080/oauth2/authorization/github` |
-| Facebook | `http://localhost:8080/oauth2/authorization/facebook` |
+| Google | `http://localhost:8081/oauth2/authorization/google` |
+| LinkedIn | `http://localhost:8081/oauth2/authorization/linkedin` |
+| GitHub | `http://localhost:8081/oauth2/authorization/github` |
+| Facebook | `http://localhost:8081/oauth2/authorization/facebook` |
 
 For these to work, the auth-service team must add real credentials to the root `.env`:
 
@@ -110,53 +118,20 @@ FACEBOOK_CLIENT_SECRET=...
 
 ## Connecting to the IA-service
 
-The Messages page uses mocks currently. When the IA-service is running:
+The Messages page already uses real integration with fallback:
 
-1. Open `src/api/messages.ts`
-2. Uncomment the blocks marked `// REAL:`
-3. Comment out the mock blocks
-4. Make sure the IA-service runs on `http://localhost:8001`
-
-### Known issue in IA-service
-
-The current `main.py` has a broken import:
-
-```python
-# ❌ This fails — ModelClient does not exist as a class
-from ai.model_client import ModelClient
-```
-
-`model_client.py` only exports the `call_model` function. Replace `main.py` with:
-
-```python
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from routes.agent_routes import router
-from dotenv import load_dotenv
-
-load_dotenv()
-
-app = FastAPI()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-app.include_router(router)
-
-@app.get("/")
-def health_check():
-    return {"status": "IA-service is running"}
-```
+1. It tries IA-service first (`POST /agent/action` with `gmail_read`)
+2. If IA fails or returns empty, it falls back to Gmail-service (`/emails` and optional `/emails/sync`)
+3. Make sure IA-service runs on `http://localhost:5000`
+4. Make sure Gmail-service runs on `http://localhost:8082`
 
 Required `.env` for IA-service:
 
 ```env
-TOKEN_VAULT_URL=http://localhost:3000
+# If IA-service runs inside docker-compose:
+TOKEN_VAULT_URL=http://auth-service:8080
+# If IA-service runs locally from your host:
+# TOKEN_VAULT_URL=http://localhost:8081
 OPENROUTER_API_KEY=your_api_key
 JWT_SECRET=orbit-super-secret-key-that-is-long-enough-for-hs256-algorithm
 ```
@@ -239,7 +214,7 @@ docker-compose up --build frontend
 ```bash
 docker ps                          # list running containers
 curl http://localhost:5173         # frontend
-curl http://localhost:8080         # auth-service
+curl http://localhost:8081         # auth-service
 ```
 
 ---

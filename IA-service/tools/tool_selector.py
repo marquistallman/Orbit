@@ -18,6 +18,15 @@ def select_tool(task: str):
     if "document" in task or "word" in task:
         return "document_edit"
 
+    if "excel" in task or "spreadsheet" in task or "xlsx" in task:
+        return "excel_edit"
+
+    # -------------------------
+    # MINI MAPS
+    # -------------------------
+    if "mini map" in task or "map" in task or "route" in task or "location" in task:
+        return "mini_maps"
+
     # -------------------------
     # CÓDIGO
     # -------------------------
