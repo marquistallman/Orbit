@@ -457,7 +457,7 @@ def _build_html() -> str:
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        const map = L.map('map').setView([{DEFAULT_CENTER_LAT}, {DEFAULT_CENTER_LNG}], {DEFAULT_ZOOM});
+        const map = L.map('map', {{ zoomControl: false }}).setView([{DEFAULT_CENTER_LAT}, {DEFAULT_CENTER_LNG}], {DEFAULT_ZOOM});
         const queryParams = new URLSearchParams(window.location.search);
         const userId = queryParams.get('user_id') || '{DEFAULT_USER_ID}';
         const pointNameInput = document.getElementById('pointName');
@@ -472,6 +472,8 @@ def _build_html() -> str:
         L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', {{
             attribution: '&copy; OpenStreetMap contributors'
         }}).addTo(map);
+
+        L.control.zoom({{ position: 'topright' }}).addTo(map);
 
         function normalizeColor(value, fallback = '#c6a15b') {{
             const normalized = (value || '').trim().toLowerCase();
