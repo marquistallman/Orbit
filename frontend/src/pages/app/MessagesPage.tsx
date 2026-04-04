@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import DashCard from '../../components/ui/DashCard'
-import { getMessages, summarizeMessage, suggestReply, sendReply, type Message } from '../../api/messages'
+import { getMessages, summarizeMessage, suggestReply, sendReply, syncMessages, formatEmailDate, type Message } from '../../api/messages'
 
 const SOURCE_COLORS: Record<string, string> = {
   gmail: '#c47070',
@@ -35,6 +35,7 @@ export default function MessagesPage() {
   const [sending,   setSending]         = useState(false)
   const [sent,      setSent]            = useState(false)
   const [sendError, setSendError]       = useState<string | null>(null)
+  const [syncing,   setSyncing]         = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
@@ -51,6 +52,20 @@ export default function MessagesPage() {
       setLoading(false)
     })
   }, [])
+
+  const handleSync = async () => {
+    setSyncing(true)
+    try {
+      await syncMessages()
+      const msgs = await getMessages()
+      setMessages(msgs)
+      if (!selected) setSelected(msgs[0] ?? null)
+    } catch {
+      // sync failed silently
+    } finally {
+      setSyncing(false)
+    }
+  }
 
   const handleSelect = (msg: Message) => {
     setSelected(msg)
@@ -122,12 +137,24 @@ export default function MessagesPage() {
         <DashCard style={{ padding: '12px 14px', flexShrink: 0 }} speed={0.0004}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: '#EDE6D6' }}>Mensajes</div>
-            {unreadCount > 0 && (
-              <div style={{
-                fontSize: 9, background: 'rgba(198,161,91,0.15)', color: '#C6A15B',
-                border: '1px solid rgba(198,161,91,0.3)', borderRadius: 10, padding: '2px 7px',
-              }}>{unreadCount} sin leer</div>
-            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {unreadCount > 0 && (
+                <div style={{
+                  fontSize: 9, background: 'rgba(198,161,91,0.15)', color: '#C6A15B',
+                  border: '1px solid rgba(198,161,91,0.3)', borderRadius: 10, padding: '2px 7px',
+                }}>{unreadCount} sin leer</div>
+              )}
+              <button onClick={handleSync} disabled={syncing} style={{
+                fontSize: 10, padding: '3px 10px', borderRadius: 5, cursor: syncing ? 'not-allowed' : 'pointer',
+                fontFamily: 'inherit',
+                border: '1px solid rgba(198,161,91,0.3)',
+                background: 'rgba(198,161,91,0.08)',
+                color: '#C6A15B',
+                opacity: syncing ? 0.6 : 1,
+              }}>
+                {syncing ? 'Sync...' : '↻ Sync'}
+              </button>
+            </div>
           </div>
 
           {/* Status filters */}
@@ -184,7 +211,7 @@ export default function MessagesPage() {
                 <span style={{ fontSize: 11, color: msg.read ? '#8C6A3E' : '#EDE6D6', fontWeight: msg.read ? 400 : 600 }}>
                   {msg.from}
                 </span>
-                <span style={{ fontSize: 9, color: '#8C6A3E' }}>{msg.date}</span>
+                <span style={{ fontSize: 9, color: '#8C6A3E' }}>{formatEmailDate(msg.date)}</span>
               </div>
               <div style={{ fontSize: 11, color: '#EDE6D6', marginBottom: 3, fontWeight: msg.read ? 400 : 500 }}>
                 {msg.subject}
@@ -226,7 +253,7 @@ export default function MessagesPage() {
               <span style={{ fontSize: 11, color: '#8C6A3E' }}>
                 De: <span style={{ color: '#C6A15B' }}>{selected.from}</span> · {selected.email}
               </span>
-              <span style={{ fontSize: 10, color: '#8C6A3E' }}>{selected.date}</span>
+              <span style={{ fontSize: 10, color: '#8C6A3E' }}>{formatEmailDate(selected.date)}</span>
             </div>
 
             {/* Action buttons */}

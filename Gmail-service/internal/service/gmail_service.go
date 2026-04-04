@@ -31,7 +31,7 @@ func (s *GmailService) GetEmails(ctx context.Context, userID string) ([]domain.E
 	return s.repo.GetEmailsByUserID(userID)
 }
 
-// SyncEmails lee de Gmail y guarda en DB usando el repositorio
+// SyncEmails lee de Gmail con paginación desde el inicio del año actual y guarda en DB
 func (s *GmailService) SyncEmails(ctx context.Context, userID string) (int, error) {
 	log.Printf("Iniciando SyncEmails para userID: %s", userID)
 	client, err := s.getGmailClient(ctx, userID)
@@ -41,20 +41,66 @@ func (s *GmailService) SyncEmails(ctx context.Context, userID string) (int, erro
 	}
 	log.Println("Gmail client obtenido exitosamente")
 
+	// Filtrar desde el 1 de enero del año actual, solo emails potencialmente financieros
+	startOfYear := time.Date(time.Now().Year(), 1, 1, 0, 0, 0, 0, time.UTC)
+	afterFilter := fmt.Sprintf("after:%s", startOfYear.Format("2006/01/02"))
+
+	// Query de Gmail para traer solo emails de bancos/pagos o con asuntos financieros
+	// Esto reduce dramáticamente el volumen vs traer toda la bandeja
+	financialQuery := `in:anywhere ` + afterFilter + ` (` +
+		`from:(bancolombia OR nequi OR daviplata OR davivienda OR bbva OR scotiabank OR itau OR paypal OR stripe OR mercadopago OR wompi OR payu OR epayco OR serviciopse OR achcolombia OR pagos.achcolombia OR avalpay OR redeban OR credibanco OR siigo OR aliexpress OR amazon OR rappi OR uber OR claro OR movistar OR tigo OR epm OR avianca OR latam OR virginmobile OR tarjetatullave OR codensa) ` +
+		`OR subject:(factura OR recibo OR invoice OR receipt OR "compra realizada" OR "compra aprobada" OR "pago realizado" OR "pago aprobado" OR "pago exitoso" OR "transaccion aprobada" OR transferencia OR retiro OR extracto OR nomina OR salary OR "order confirmed" OR "payment confirmed" OR subscription OR topup OR recarga OR PSE OR "pago PSE" OR "tu pago" OR "tu compra" OR comprobante OR "estado de cuenta")` +
+		`)`
+	log.Printf("Query Gmail: %s", financialQuery)
+
 	user := "me"
-	listRes, err := client.Users.Messages.List(user).MaxResults(50).Do()
-	if err != nil {
-		log.Printf("Error al listar mensajes de gmail: %v", err)
-		return 0, err
+	seenIDs := map[string]bool{}
+	var allMessages []struct{ Id string }
+
+	// Ejecutar múltiples queries y combinar resultados deduplicando por ID
+	queries := []string{
+		// Query específico para PSE/ACH Colombia — garantiza captura de todos los PSE
+		`in:anywhere ` + afterFilter + ` from:serviciopse`,
+		`in:anywhere ` + afterFilter + ` from:achcolombia`,
+		// Query financiero general
+		financialQuery,
 	}
-	log.Printf("Se encontraron %d mensajes", len(listRes.Messages))
+
+	for _, q := range queries {
+		pageToken := ""
+		for {
+			req := client.Users.Messages.List(user).
+				Q(q).
+				MaxResults(500)
+			if pageToken != "" {
+				req = req.PageToken(pageToken)
+			}
+			listRes, err := req.Do()
+			if err != nil {
+				log.Printf("Error al listar mensajes: %v", err)
+				break
+			}
+			for _, m := range listRes.Messages {
+				if !seenIDs[m.Id] {
+					seenIDs[m.Id] = true
+					allMessages = append(allMessages, struct{ Id string }{m.Id})
+				}
+			}
+			log.Printf("Total acumulado: %d msgs", len(allMessages))
+			if listRes.NextPageToken == "" {
+				break
+			}
+			pageToken = listRes.NextPageToken
+		}
+	}
+
+	log.Printf("Total mensajes a procesar: %d", len(allMessages))
 
 	count := 0
-	for _, msg := range listRes.Messages {
-		log.Printf("Procesando mensaje con ID: %s", msg.Id)
+	for _, msg := range allMessages {
 		fullMsg, err := client.Users.Messages.Get(user, msg.Id).Format("full").Do()
 		if err != nil {
-			log.Printf("Error al obtener mensaje completo: %v", err)
+			log.Printf("Error al obtener mensaje %s: %v", msg.Id, err)
 			continue
 		}
 
@@ -65,17 +111,51 @@ func (s *GmailService) SyncEmails(ctx context.Context, userID string) (int, erro
 			Sender:     getHeader(fullMsg.Payload.Headers, "From"),
 			Snippet:    fullMsg.Snippet,
 			BodyHTML:   getBodyFromPayload(fullMsg.Payload),
-			ReceivedAt: time.Unix(fullMsg.InternalDate/1000, 0),
+			ReceivedAt: time.Unix(fullMsg.InternalDate/1000, 0).UTC(),
 		}
 
 		if err := s.repo.SaveEmail(email); err == nil {
 			count++
 		} else {
-			log.Printf("Error al guardar email en la DB: %v", err)
+			log.Printf("Error al guardar email %s: %v", msg.Id, err)
 		}
 	}
-	log.Printf("Se guardaron %d emails nuevos", count)
+	log.Printf("Se guardaron %d emails nuevos del año %d", count, time.Now().Year())
 	return count, nil
+}
+
+func (s *GmailService) DeleteEmailsByUserID(ctx context.Context, userID string) (int64, error) {
+	return s.repo.DeleteEmailsByUserID(userID)
+}
+
+// SearchMessages ejecuta un query de Gmail y devuelve subjects+senders de los primeros resultados (debug)
+func (s *GmailService) SearchMessages(ctx context.Context, userID string, q string) ([]map[string]string, error) {
+	client, err := s.getGmailClient(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	listRes, err := client.Users.Messages.List("me").Q(q).MaxResults(10).Do()
+	if err != nil {
+		return nil, err
+	}
+	var results []map[string]string
+	for _, m := range listRes.Messages {
+		msg, err := client.Users.Messages.Get("me", m.Id).Format("metadata").MetadataHeaders("Subject", "From").Do()
+		if err != nil {
+			continue
+		}
+		row := map[string]string{"id": m.Id}
+		for _, h := range msg.Payload.Headers {
+			if h.Name == "Subject" {
+				row["subject"] = h.Value
+			}
+			if h.Name == "From" {
+				row["from"] = h.Value
+			}
+		}
+		results = append(results, row)
+	}
+	return results, nil
 }
 
 func (s *GmailService) SendEmail(ctx context.Context, req domain.EmailRequest) error {

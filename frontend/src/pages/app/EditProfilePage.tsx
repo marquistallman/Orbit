@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
+import { updateProfile } from '../../api/profile'
 import DashCard from '../../components/ui/DashCard'
 
 function Avatar({ name }: { name: string }) {
@@ -46,25 +47,39 @@ function Input({
 
 export default function EditProfilePage() {
   const navigate = useNavigate()
-  const { user } = useAuthStore()
+  const { user, updateUser } = useAuthStore()
 
-  const [form, setForm] = useState({
-    firstName:   user?.username?.split(' ')[0] || 'Nicolas',
-    lastName:    user?.username?.split(' ')[1] || 'Luis',
-    email:       user?.email || 'luis@gmail.com',
-    description: 'Frontend developer passionate about futuristic interfaces and autonomous agents.',
-    timezone:    'UTC-5 (Bogotá)',
-    language:    'English',
-    password:    '',
-    newPassword: '',
-  })
+  const [name, setName]               = useState(user?.username || '')
+  const [currentPassword, setCurrent] = useState('')
+  const [newPassword, setNew]         = useState('')
+  const [saving, setSaving]           = useState(false)
+  const [error, setError]             = useState('')
+  const [success, setSuccess]         = useState(false)
 
-  const set = (k: keyof typeof form) => (v: string) => setForm(f => ({ ...f, [k]: v }))
-  const fullName = `${form.firstName} ${form.lastName}`.trim()
-
-  const handleSave = () => {
-    // TODO: connect to auth-service PUT /api/auth/profile
-    navigate('/app/profile')
+  const handleSave = async () => {
+    setSaving(true)
+    setError('')
+    setSuccess(false)
+    try {
+      const payload: { username?: string; currentPassword?: string; newPassword?: string } = {}
+      if (name.trim() && name.trim() !== user?.username) payload.username = name.trim()
+      if (newPassword) {
+        payload.currentPassword = currentPassword
+        payload.newPassword = newPassword
+      }
+      if (Object.keys(payload).length === 0) {
+        navigate('/app/profile')
+        return
+      }
+      const updated = await updateProfile(payload)
+      updateUser({ username: updated.username })
+      setSuccess(true)
+      setTimeout(() => navigate('/app/profile'), 800)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Error al guardar')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -72,61 +87,63 @@ export default function EditProfilePage() {
       padding: '20px 24px', background: '#1a1a1a',
       height: 'calc(100vh - 56px)', overflowY: 'auto',
     }}>
-      {/* Header */}
       <DashCard speed={0.0004} style={{ marginBottom: 14, padding: '18px 22px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
-          <Avatar name={fullName} />
+          <Avatar name={name || user?.username || '?'} />
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 20, fontWeight: 600, color: '#EDE6D6', marginBottom: 4 }}>
-              Edit Profile
-            </div>
+            <div style={{ fontSize: 20, fontWeight: 600, color: '#EDE6D6', marginBottom: 4 }}>Edit Profile</div>
             <div style={{ fontSize: 12, color: '#8C6A3E' }}>
-              Update your personal information. The changes will be reflected across the entire platform.
+              Update your personal information. Changes are reflected across the platform.
             </div>
           </div>
           <div style={{ width: 70, height: 70, borderRadius: '50%', border: '1px solid rgba(198,161,91,0.1)', flexShrink: 0 }} />
         </div>
       </DashCard>
 
-      {/* Personal info */}
       <DashCard speed={0.0003} style={{ marginBottom: 14, padding: '18px 22px' }}>
         <div style={{ fontSize: 10, color: '#C6A15B', textTransform: 'uppercase' as const, letterSpacing: 2, marginBottom: 16 }}>
           Personal Information
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-          <Input label="Name"        value={form.firstName}   onChange={set('firstName')} />
-          <Input label="Last Name"   value={form.lastName}    onChange={set('lastName')} />
-          <Input label="Email"       value={form.email}       onChange={set('email')} type="email" span />
-          <Input label="Description" value={form.description} onChange={set('description')} span textarea />
-          <Input label="Timezone"    value={form.timezone}    onChange={set('timezone')} />
-          <Input label="Language"    value={form.language}    onChange={set('language')} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <Input label="Name" value={name} onChange={setName} />
+          <Input label="Email (read-only)" value={user?.email || ''} onChange={() => {}} type="email" />
         </div>
       </DashCard>
 
-      {/* Password */}
       <DashCard speed={0.0003} style={{ marginBottom: 14, padding: '18px 22px' }}>
         <div style={{ fontSize: 10, color: '#C6A15B', textTransform: 'uppercase' as const, letterSpacing: 2, marginBottom: 16 }}>
-          Password
+          Change Password
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-          <Input label="Current Password" value={form.password}    onChange={set('password')}    type="password" />
-          <Input label="New Password"     value={form.newPassword} onChange={set('newPassword')} type="password" />
+          <Input label="Current Password" value={currentPassword} onChange={setCurrent} type="password" />
+          <Input label="New Password"     value={newPassword}     onChange={setNew}     type="password" />
+        </div>
+        <div style={{ fontSize: 10, color: '#8C6A3E', marginTop: 8 }}>
+          Leave blank to keep your current password.
         </div>
       </DashCard>
 
-      {/* Actions */}
+      {error && (
+        <div style={{ fontSize: 12, color: '#c47070', marginBottom: 10, padding: '8px 14px', background: 'rgba(154,74,74,0.1)', borderRadius: 6, border: '1px solid rgba(154,74,74,0.3)' }}>
+          ⚠ {error}
+        </div>
+      )}
+
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
         <button onClick={() => navigate('/app/profile')} style={{
           background: 'none', border: '1px solid rgba(198,161,91,0.2)',
           borderRadius: 6, color: '#8C6A3E', cursor: 'pointer',
           fontFamily: 'Questrial, sans-serif', fontSize: 12, padding: '9px 22px',
         }}>Cancel</button>
-        <button onClick={handleSave} style={{
-          background: 'rgba(198,161,91,0.1)', border: '1px solid #C6A15B',
-          borderRadius: 6, color: '#C6A15B', cursor: 'pointer',
-          fontFamily: 'Questrial, sans-serif', fontSize: 12, padding: '9px 22px',
-          fontWeight: 600,
-        }}>Save changes</button>
+        <button onClick={handleSave} disabled={saving} style={{
+          background: success ? 'rgba(74,154,89,0.15)' : 'rgba(198,161,91,0.1)',
+          border: `1px solid ${success ? '#4a9a59' : '#C6A15B'}`,
+          borderRadius: 6, color: success ? '#4a9a59' : '#C6A15B', cursor: saving ? 'not-allowed' : 'pointer',
+          fontFamily: 'Questrial, sans-serif', fontSize: 12, padding: '9px 22px', fontWeight: 600,
+          opacity: saving ? 0.7 : 1, transition: 'all 0.3s',
+        }}>
+          {success ? '✓ Saved' : saving ? 'Saving...' : 'Save changes'}
+        </button>
       </div>
     </div>
   )

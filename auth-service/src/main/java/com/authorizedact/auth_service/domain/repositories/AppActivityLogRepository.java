@@ -10,4 +10,5 @@ import java.util.UUID;
 @Repository
 public interface AppActivityLogRepository extends JpaRepository<AppActivityLog, UUID> {
     List<AppActivityLog> findTop20ByUserIdOrderByCreatedAtDesc(UUID userId);
+    void deleteByUserId(UUID userId);
 }

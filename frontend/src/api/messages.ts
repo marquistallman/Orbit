@@ -1,5 +1,21 @@
 const IA_URL = import.meta.env.VITE_IA_URL || 'http://localhost:5000'
 
+export function formatEmailDate(isoString: string): string {
+  if (!isoString) return ''
+  try {
+    const dt = new Date(isoString)
+    const now = new Date()
+    const dtDate = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate())
+    const todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const diffDays = Math.round((todayDate.getTime() - dtDate.getTime()) / 86400000)
+    if (diffDays === 0) return `Hoy, ${dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+    if (diffDays === 1) return 'Ayer'
+    return dt.toLocaleDateString([], { day: 'numeric', month: 'short' })
+  } catch {
+    return isoString
+  }
+}
+
 export interface Message {
   id: string
   from: string
@@ -50,6 +66,16 @@ export const suggestReply = async (body: string): Promise<string> => {
   if (!res.ok) throw new Error('Failed to suggest reply')
   const data = await res.json()
   return data.response ?? ''
+}
+
+export const syncMessages = async (): Promise<number> => {
+  const res = await fetch(`${IA_URL}/messages/sync`, {
+    method: 'POST',
+    headers: authHeaders(),
+  })
+  if (!res.ok) throw new Error(`Sync failed: ${res.status}`)
+  const data = await res.json()
+  return data.synced ?? 0
 }
 
 export const sendReply = async (to: string, subject: string, body: string): Promise<void> => {

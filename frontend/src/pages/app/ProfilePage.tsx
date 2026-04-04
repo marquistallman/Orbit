@@ -2,12 +2,15 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
 import { getAgentPlan, getAgentUsage, type AgentPlanResponse, type AgentUsageResponse } from '../../api/agent'
+import { getConnectedApps } from '../../api/apps'
+import { deleteAccount } from '../../api/profile'
 import DashCard from '../../components/ui/DashCard'
-import SubtleBorderAnimation from '../../components/orbit/SubtleBorderAnimation'
 
-const MOCK_STATS = {
-  tasks: 247, apps: 4, success: 100,
-  lastSession: 'Today, 14:30', activeDays: 14, agentExecuted: 38,
+const IA_URL = import.meta.env.VITE_IA_URL || 'http://localhost:5000'
+
+function authHeaders(): Record<string, string> {
+  const token = localStorage.getItem('token')
+  return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
 function Avatar({ name }: { name: string }) {
@@ -40,65 +43,74 @@ function Field({ label, value }: { label: string; value: string }) {
   )
 }
 
-function Input({
-  label, value, onChange, type = 'text', span = false, textarea = false
-}: {
-  label: string; value: string; onChange: (v: string) => void
-  type?: string; span?: boolean; textarea?: boolean
+function DeleteModal({ onConfirm, onCancel, loading }: {
+  onConfirm: () => void
+  onCancel: () => void
+  loading: boolean
 }) {
-  const base: React.CSSProperties = {
-    width: '100%', background: '#1B1B1B',
-    border: '1px solid rgba(198,161,91,0.25)',
-    borderRadius: 7, padding: '10px 14px',
-    fontSize: 12, color: '#EDE6D6',
-    fontFamily: 'Questrial, sans-serif',
-    outline: 'none', resize: 'none' as const,
-    boxSizing: 'border-box' as const,
-  }
   return (
-    <div style={{ gridColumn: span ? '1 / -1' : 'auto', display: 'flex', flexDirection: 'column', gap: 5 }}>
-      <label style={{ fontSize: 10, color: '#8C6A3E', letterSpacing: 1 }}>{label}</label>
-      {textarea
-        ? <textarea value={value} onChange={e => onChange(e.target.value)} rows={3} style={base} />
-        : <input type={type} value={value} onChange={e => onChange(e.target.value)} style={base} />
-      }
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 1000,
+      background: 'rgba(0,0,0,0.7)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>
+      <div style={{
+        background: '#1e1e1e', border: '1px solid rgba(154,74,74,0.5)',
+        borderRadius: 10, padding: '28px 32px', maxWidth: 420, width: '90%',
+      }}>
+        <div style={{ fontSize: 16, fontWeight: 600, color: '#EDE6D6', marginBottom: 10 }}>
+          Delete account?
+        </div>
+        <div style={{ fontSize: 12, color: '#8C6A3E', lineHeight: 1.7, marginBottom: 24 }}>
+          This action is <span style={{ color: '#c47070' }}>permanent and irreversible</span>.
+          All your data, connected apps and activity history will be permanently deleted.
+        </div>
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          <button onClick={onCancel} disabled={loading} style={{
+            background: 'none', border: '1px solid rgba(198,161,91,0.25)',
+            borderRadius: 6, color: '#8C6A3E', cursor: 'pointer',
+            fontFamily: 'Questrial, sans-serif', fontSize: 12, padding: '8px 18px',
+          }}>Cancel</button>
+          <button onClick={onConfirm} disabled={loading} style={{
+            background: 'rgba(154,74,74,0.15)', border: '1px solid rgba(154,74,74,0.6)',
+            borderRadius: 6, color: '#c47070', cursor: loading ? 'not-allowed' : 'pointer',
+            fontFamily: 'Questrial, sans-serif', fontSize: 12, padding: '8px 18px',
+            fontWeight: 600, opacity: loading ? 0.7 : 1,
+          }}>
+            {loading ? 'Deleting...' : 'Yes, delete my account'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
 
 export default function ProfilePage() {
   const navigate  = useNavigate()
-  const { user }  = useAuthStore()
-  const [form, setForm] = useState({
-    firstName:   user?.username?.split(' ')[0] || 'Nicolas',
-    lastName:    user?.username?.split(' ')[1] || 'Luis',
-    email:       user?.email || 'luis@gmail.com',
-    description: 'Frontend developer passionate about futuristic interfaces and autonomous agents.',
-    timezone:    'UTC-5 (Bogotá)',
-    language:    'English',
-    password:    '',
-    newPassword: '',
-  })
+  const { user, logout } = useAuthStore()
 
-  const [plan, setPlan] = useState<AgentPlanResponse | null>(null)
+  const [plan, setPlan]   = useState<AgentPlanResponse | null>(null)
   const [usage, setUsage] = useState<AgentUsageResponse | null>(null)
   const [loadingPlan, setLoadingPlan] = useState(true)
-  const [errorPlan, setErrorPlan] = useState('')
+  const [errorPlan, setErrorPlan]     = useState('')
+
+  const [taskCount, setTaskCount]         = useState<number | null>(null)
+  const [successRate, setSuccessRate]     = useState<number | null>(null)
+  const [appsCount, setAppsCount]         = useState<number | null>(null)
+  const [memberSince, setMemberSince]     = useState('—')
+
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleting, setDeleting]               = useState(false)
 
   const fetchPlanAndUsage = useCallback(async () => {
     try {
       setLoadingPlan(true)
       setErrorPlan('')
-      const [planData, usageData] = await Promise.all([
-        getAgentPlan(),
-        getAgentUsage(),
-      ])
+      const [planData, usageData] = await Promise.all([getAgentPlan(), getAgentUsage()])
       setPlan(planData)
       setUsage(usageData)
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Error loading plan'
-      setErrorPlan(msg)
-      console.error('Error fetching plan/usage:', err)
+      setErrorPlan(err instanceof Error ? err.message : 'Error loading plan')
     } finally {
       setLoadingPlan(false)
     }
@@ -106,60 +118,100 @@ export default function ProfilePage() {
 
   useEffect(() => {
     fetchPlanAndUsage()
+
+    // Agent history → tasks count & success rate
+    fetch(`${IA_URL}/agent/history`, { headers: authHeaders() })
+      .then(r => r.ok ? r.json() : { tasks: [] })
+      .then(data => {
+        const tasks: { status: string }[] = data.tasks ?? []
+        const total = tasks.length
+        const completed = tasks.filter(t => t.status === 'completed').length
+        setTaskCount(total)
+        setSuccessRate(total > 0 ? Math.round((completed / total) * 100) : 0)
+      })
+      .catch(() => {})
+
+    // Connected apps count
+    getConnectedApps()
+      .then(apps => setAppsCount(apps.length))
+      .catch(() => {})
   }, [fetchPlanAndUsage])
 
-  const set = (k: keyof typeof form) => (v: string) => setForm(f => ({ ...f, [k]: v }))
+  // Member since — derived from user createdAt or profile API
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (!token) return
+    fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/profile/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.createdAt) {
+          const d = new Date(data.createdAt)
+          setMemberSince(d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }))
+        }
+      })
+      .catch(() => {})
+  }, [])
 
-  const fullName    = `${form.firstName} ${form.lastName}`.trim()
-  const memberSince = 'March 2026'
-
-  const handleSave = () => {
-      // TODO: connect to auth-service PUT /api/auth/profile
-      navigate('/app/profile')
+  const handleDeleteAccount = async () => {
+    setDeleting(true)
+    try {
+      await deleteAccount()
+      // Clear in-memory task history from IA-service
+      const token = localStorage.getItem('token')
+      if (token) {
+        fetch(`${IA_URL}/agent/tasks`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+        }).catch(() => {})
+      }
+      logout()
+      setTimeout(() => window.location.href = '/', 100)
+    } catch {
+      setDeleting(false)
+      setShowDeleteModal(false)
+    }
   }
 
   const toSafeNumber = (value: unknown) => {
     if (typeof value === 'number') return Number.isFinite(value) ? value : 0
-    if (typeof value === 'string') {
-      const parsed = Number(value)
-      return Number.isFinite(parsed) ? parsed : 0
-    }
+    if (typeof value === 'string') { const p = Number(value); return Number.isFinite(p) ? p : 0 }
     return 0
   }
 
-  const promptsUsed = toSafeNumber(usage?.prompt_count)
-  const promptsLimit = toSafeNumber(plan?.plan?.monthly_prompts)
-  const inputTokensUsed = toSafeNumber(usage?.input_tokens)
-  const inputTokensLimit = toSafeNumber(plan?.plan?.monthly_input_tokens)
-  const outputTokensUsed = toSafeNumber(usage?.output_tokens)
-  const outputTokensLimit = toSafeNumber(plan?.plan?.monthly_output_tokens)
-  const costUsed = toSafeNumber(usage?.estimated_cost_usd)
+  const promptsUsed        = toSafeNumber(usage?.prompt_count)
+  const promptsLimit       = toSafeNumber(plan?.plan?.monthly_prompts)
+  const inputTokensUsed    = toSafeNumber(usage?.input_tokens)
+  const inputTokensLimit   = toSafeNumber(plan?.plan?.monthly_input_tokens)
+  const outputTokensUsed   = toSafeNumber(usage?.output_tokens)
+  const outputTokensLimit  = toSafeNumber(plan?.plan?.monthly_output_tokens)
+  const costUsed           = toSafeNumber(usage?.estimated_cost_usd)
+  const toPercent = (used: number, limit: number) => limit <= 0 ? 0 : Math.min(100, (used / limit) * 100)
 
-  const toPercent = (used: number, limit: number) => {
-    if (limit <= 0) return 0
-    return Math.min(100, (used / limit) * 100)
-  }
+  const fullName = user?.username || '—'
 
-  // Calculate usage percentages
-  const promptsPercent = toPercent(promptsUsed, promptsLimit)
-  const inputTokensPercent = toPercent(inputTokensUsed, inputTokensLimit)
-  const outputTokensPercent = toPercent(outputTokensUsed, outputTokensLimit)
-
-  // ── View mode ──────────────────────────────────────────────
   return (
     <div style={{
       padding: '20px 24px', background: '#1a1a1a',
       height: 'calc(100vh - 56px)', overflowY: 'auto',
       display: 'flex', flexDirection: 'column', gap: 14,
     }}>
+      {showDeleteModal && (
+        <DeleteModal
+          onConfirm={handleDeleteAccount}
+          onCancel={() => setShowDeleteModal(false)}
+          loading={deleting}
+        />
+      )}
+
       {/* Profile header */}
       <DashCard speed={0.0004} style={{ padding: '18px 22px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
           <Avatar name={fullName} />
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 20, fontWeight: 600, color: '#EDE6D6', marginBottom: 3 }}>{fullName}</div>
-            <div style={{ fontSize: 12, color: '#C6A15B', marginBottom: 6 }}>{form.email}</div>
-            <div style={{ fontSize: 12, color: '#8C6A3E', marginBottom: 6 }}>{form.description}</div>
+            <div style={{ fontSize: 12, color: '#C6A15B', marginBottom: 6 }}>{user?.email}</div>
             <div style={{ fontSize: 10, color: '#8C6A3E' }}>
               <span style={{ color: '#C6A15B', marginRight: 4 }}>—</span>
               Member since {memberSince}
@@ -171,119 +223,56 @@ export default function ProfilePage() {
             fontFamily: 'Questrial, sans-serif', fontSize: 12, padding: '8px 18px',
             flexShrink: 0,
           }}>Edit profile</button>
-          <div style={{
-            width: 70, height: 70, borderRadius: '50%',
-            border: '1px solid rgba(198,161,91,0.08)',
-            flexShrink: 0,
-          }} />
         </div>
       </DashCard>
 
-      {/* Account info + Activity */}
+      {/* Account info + Usage */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-
-        {/* Account Information */}
         <DashCard speed={0.0003} style={{ padding: '16px 20px' }}>
           <div style={{ fontSize: 10, color: '#C6A15B', textTransform: 'uppercase' as const, letterSpacing: 2, marginBottom: 4 }}>
             Account Information
           </div>
           <Field label="Full Name" value={fullName} />
-          <Field label="Email"     value={form.email} />
-          <Field label="Timezone"  value={form.timezone} />
-          <Field label="Language"  value={form.language} />
+          <Field label="Email"     value={user?.email || '—'} />
           <Field label="Plan"      value={usage?.plan_name || (loadingPlan ? 'Loading...' : 'free')} />
         </DashCard>
 
-        {/* Plan & Usage */}
         <DashCard speed={0.0003} style={{ padding: '16px 20px' }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            marginBottom: 12,
-          }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <div style={{ fontSize: 10, color: '#C6A15B', textTransform: 'uppercase' as const, letterSpacing: 2 }}>
               Usage & Limits
             </div>
-            <button
-              onClick={fetchPlanAndUsage}
-              disabled={loadingPlan}
-              style={{
-                background: 'none',
-                border: '1px solid rgba(198,161,91,0.35)',
-                borderRadius: 6,
-                color: loadingPlan ? '#8C6A3E' : '#C6A15B',
-                cursor: loadingPlan ? 'not-allowed' : 'pointer',
-                fontFamily: 'Questrial, sans-serif',
-                fontSize: 11,
-                padding: '6px 12px',
-              }}
-            >
+            <button onClick={fetchPlanAndUsage} disabled={loadingPlan} style={{
+              background: 'none', border: '1px solid rgba(198,161,91,0.35)',
+              borderRadius: 6, color: loadingPlan ? '#8C6A3E' : '#C6A15B',
+              cursor: loadingPlan ? 'not-allowed' : 'pointer',
+              fontFamily: 'Questrial, sans-serif', fontSize: 11, padding: '6px 12px',
+            }}>
               {loadingPlan ? 'Refreshing...' : 'Refresh'}
             </button>
           </div>
-          
-          {errorPlan && (
-            <div style={{ fontSize: 11, color: '#9a4a4a', marginBottom: 12 }}>
-              {errorPlan}
-            </div>
-          )}
+
+          {errorPlan && <div style={{ fontSize: 11, color: '#9a4a4a', marginBottom: 12 }}>{errorPlan}</div>}
 
           {loadingPlan ? (
             <div style={{ fontSize: 12, color: '#8C6A3E' }}>Loading usage...</div>
           ) : usage && plan ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {/* Prompts */}
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 11 }}>
-                  <span style={{ color: '#8C6A3E' }}>Prompts</span>
-                  <span style={{ color: '#C6A15B' }}>{promptsUsed} / {promptsLimit}</span>
+              {[
+                { label: 'Prompts',       used: promptsUsed,      limit: promptsLimit,      pct: toPercent(promptsUsed, promptsLimit) },
+                { label: 'Input tokens',  used: inputTokensUsed,  limit: inputTokensLimit,  pct: toPercent(inputTokensUsed, inputTokensLimit) },
+                { label: 'Output tokens', used: outputTokensUsed, limit: outputTokensLimit, pct: toPercent(outputTokensUsed, outputTokensLimit) },
+              ].map(m => (
+                <div key={m.label}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 11 }}>
+                    <span style={{ color: '#8C6A3E' }}>{m.label}</span>
+                    <span style={{ color: '#C6A15B' }}>{m.used} / {m.limit}</span>
+                  </div>
+                  <div style={{ width: '100%', height: 6, background: 'rgba(198,161,91,0.1)', borderRadius: 3, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', background: 'linear-gradient(90deg, #C6A15B, #A67C52)', width: `${m.pct}%`, transition: 'width 0.3s ease' }} />
+                  </div>
                 </div>
-                <div style={{
-                  width: '100%', height: 6, background: 'rgba(198,161,91,0.1)',
-                  borderRadius: 3, overflow: 'hidden',
-                }}>
-                  <div style={{
-                    height: '100%', background: 'linear-gradient(90deg, #C6A15B, #A67C52)',
-                    width: `${promptsPercent}%`, transition: 'width 0.3s ease',
-                  }} />
-                </div>
-              </div>
-
-              {/* Input tokens */}
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 11 }}>
-                  <span style={{ color: '#8C6A3E' }}>Input tokens</span>
-                  <span style={{ color: '#C6A15B' }}>{inputTokensUsed} / {inputTokensLimit}</span>
-                </div>
-                <div style={{
-                  width: '100%', height: 6, background: 'rgba(198,161,91,0.1)',
-                  borderRadius: 3, overflow: 'hidden',
-                }}>
-                  <div style={{
-                    height: '100%', background: 'linear-gradient(90deg, #C6A15B, #A67C52)',
-                    width: `${inputTokensPercent}%`, transition: 'width 0.3s ease',
-                  }} />
-                </div>
-              </div>
-
-              {/* Output tokens */}
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 11 }}>
-                  <span style={{ color: '#8C6A3E' }}>Output tokens</span>
-                  <span style={{ color: '#C6A15B' }}>{outputTokensUsed} / {outputTokensLimit}</span>
-                </div>
-                <div style={{
-                  width: '100%', height: 6, background: 'rgba(198,161,91,0.1)',
-                  borderRadius: 3, overflow: 'hidden',
-                }}>
-                  <div style={{
-                    height: '100%', background: 'linear-gradient(90deg, #C6A15B, #A67C52)',
-                    width: `${outputTokensPercent}%`, transition: 'width 0.3s ease',
-                  }} />
-                </div>
-              </div>
-
+              ))}
               <div style={{ fontSize: 11, color: '#8C6A3E' }}>
                 Estimated monthly cost: <span style={{ color: '#C6A15B' }}>${costUsed.toFixed(4)}</span>
               </div>
@@ -297,30 +286,22 @@ export default function ProfilePage() {
         <div style={{ fontSize: 10, color: '#C6A15B', textTransform: 'uppercase' as const, letterSpacing: 2, marginBottom: 12 }}>
           Operator Activity
         </div>
-
-        {/* Stats row */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: 16 }}>
-            {[
-              { value: MOCK_STATS.tasks,   label: 'Tasks'   },
-              { value: MOCK_STATS.apps,    label: 'Apps'    },
-              { value: `${MOCK_STATS.success}%`, label: 'Success' },
-            ].map(s => (
-              <div key={s.label} style={{
-                border: '1px solid rgba(198,161,91,0.2)',
-                borderRadius: 7, padding: '10px 8px', textAlign: 'center' as const,
-              }}>
-                <div style={{ fontSize: 22, fontWeight: 700, color: '#C6A15B', lineHeight: 1 }}>{s.value}</div>
-                <div style={{ fontSize: 9, color: '#8C6A3E', textTransform: 'uppercase' as const, letterSpacing: 1, marginTop: 4 }}>{s.label}</div>
-              </div>
-            ))}
-          </div>
-
-          <div style={{ borderTop: '1px solid rgba(198,161,91,0.08)', paddingTop: 12 }}>
-            <Field label="Last session"    value={MOCK_STATS.lastSession} />
-            <Field label="Active days"     value={`${MOCK_STATS.activeDays} days`} />
-            <Field label="Agent executed"  value={`${MOCK_STATS.agentExecuted} times`} />
-          </div>
-        </DashCard>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: 16 }}>
+          {[
+            { value: taskCount  !== null ? taskCount  : '—', label: 'Tasks'   },
+            { value: appsCount  !== null ? appsCount  : '—', label: 'Apps'    },
+            { value: successRate !== null ? `${successRate}%` : '—', label: 'Success' },
+          ].map(s => (
+            <div key={s.label} style={{
+              border: '1px solid rgba(198,161,91,0.2)',
+              borderRadius: 7, padding: '10px 8px', textAlign: 'center' as const,
+            }}>
+              <div style={{ fontSize: 22, fontWeight: 700, color: '#C6A15B', lineHeight: 1 }}>{s.value}</div>
+              <div style={{ fontSize: 9, color: '#8C6A3E', textTransform: 'uppercase' as const, letterSpacing: 1, marginTop: 4 }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+      </DashCard>
 
       {/* Danger zone */}
       <div style={{
@@ -336,7 +317,7 @@ export default function ProfilePage() {
             Delete account and all associated data permanently
           </div>
         </div>
-        <button style={{
+        <button onClick={() => setShowDeleteModal(true)} style={{
           background: 'none', border: '1px solid rgba(154,74,74,0.5)',
           borderRadius: 6, color: '#9a4a4a', cursor: 'pointer',
           fontFamily: 'Questrial, sans-serif', fontSize: 12, padding: '8px 18px',

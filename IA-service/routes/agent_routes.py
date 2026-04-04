@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from agents.agent import Agent
-from agents.task_memory import get_task, get_history
+from agents.task_memory import get_task, get_history, clear_tasks
 from ai.user_memory import resolve_user_id
 from ai.usage_meter import PlanCatalog, UsageStore, compute_estimated_cost, estimate_tokens, evaluate_limits
 from tools.registry import get_tools
@@ -17,6 +17,7 @@ from utils.logger import logger
 import re
 import html as _html
 import requests as _requests
+import threading
 from datetime import timezone, timedelta
 
 router = APIRouter()
@@ -27,28 +28,80 @@ usage_store = UsageStore(os.getenv("USAGE_DB_PATH", os.path.join(os.path.dirname
 
 GMAIL_SERVICE_URL = os.getenv("GMAIL_SERVICE_URL", "http://localhost:8082")
 
-FINANCE_KEYWORDS = [
-    "factura", "recibo", "invoice", "receipt", "payment", "pago", "cobro",
-    "transferencia", "compra", "purchase", "charge", "débito", "debito",
-    "transacción", "transaccion", "order", "orden", "subscription", "suscripcion",
-    "bill", "cuenta", "estado de cuenta", "confirmación de pago", "paid",
-    "$", "usd", "cop", "precio", "price", "salary", "salario", "earnings",
-    "ingresos", "mercado", "portfolio", "stock", "vacante", "empleo",
-    "por mes", "mensual", "annual", "total",
+# Dominios de senders bancarios/pagos confiables — substring match contra el sender
+BANK_SENDER_DOMAINS = [
+    "bancolombia.com", "nequi.com", "daviplata.com", "davivienda.com",
+    "bbva.com", "scotiabank.com", "itau.com", "bancodebogota.com",
+    "colpatria.com", "bancocajasocial.com", "bancofalabella.com",
+    "paypal.com", "stripe.com", "mercadopago.com", "wompi.co",
+    "epayco.co", "payu.com", "pse.com.co",
+    "achcolombia.com",      # PSE / ACH Colombia — cubre achcolombia.com y achcolombia.com.co
+    "pagos.achcolombia",    # notificaciones@pagos.achcolombia.com.co
+    "serviciopse",          # correos PSE genéricos
+    "redeban.com", "credibanco.com", "transfiya.com", "avalpay.com",
+    "siigo.net", "siigo.com",           # Facturación electrónica Colombia
+    "virginmobile.com.co",              # Virgin Mobile Colombia - recibos PSE
+    "virginmobilela.com",               # alias alternativo Virgin Mobile
+    "tarjetatullave.com",               # Tullave - transporte Bogotá
+    "epm.com.co", "codensa.com.co",     # Servicios públicos Colombia
+    "grupobancolombia.com",             # otro dominio Bancolombia
+    # NOTA: NO agregar dominios genéricos como 'notificaciones@' — causa falsos positivos
 ]
 
-PROMO_KEYWORDS = [
-    # Promociones claras
-    "aprovecha", "oferta", "promocion", "promo", "descuento", "discount",
-    "vuelven a ti", "cashback", "bre-b", "rentabilidad preferencial",
-    "si recibes desde", "puedes tener", "empieza a ahorrar", "tus metas",
-    "no esperes más",
-    # Transacciones fallidas/rechazadas (frases específicas, no palabras sueltas)
-    "transacción rechazada", "pago rechazado", "transaccion rechazada",
-    "denegada", "denegado", "declined",
-    "transacción fallida", "pago fallido", "transaccion fallida",
-    "no aprobada", "no autorizada",
-    "transacción cancelada", "pago cancelado", "transaccion cancelada",
+# Dominios de remitentes que SERÍAN financieros pero envían mucho marketing/newsletters
+# Para estos se requiere que el ASUNTO confirme la transacción (no basta el dominio solo)
+MARKETING_SENDER_DOMAINS = [
+    "accival.com", "fiduciaria", "inversiones",
+    "interactivebrokers.com", "tdameritrade.com", "schwab.com",
+    "falabella.com.co",    # envía muchos correos de puntos CMR que no son transacciones
+    "homecenter.com.co", "cmr.com.co",
+]
+
+# Palabras en el asunto que indican que es marketing/promo — EXCLUIR aunque venga de banco
+PROMO_SUBJECT_BLACKLIST = [
+    "boletín", "boletin", "newsletter", "invierte", "invertir", "inversión", "inversion",
+    "rentabilidad", "oportunidad", "oferta", "promoción", "promocion", "descuento",
+    "quedan", "últimos días", "ultimos dias", "solo por", "gana", "gane",
+    "puntos cmr", "cmr puntos", "te regalamos", "regalo", "sorpresa",
+    "trading voucher", "will the", "will the fed", "will the supreme",
+    "earn interest", "interest rate", "cpi exceed", "yoy change",
+    "rate in april", "rates in",
+    "solo para ti", "exclusivo para ti", "te premiamos", "te premiaron",
+    "100% protegido", "100% protegi", "capital 100",
+]
+
+# Frases en el ASUNTO que confirman que es una transacción real (no noticia/promo)
+# IMPORTANTE: mantener estas frases específicas y compuestas — palabras sueltas causan falsos positivos
+TRANSACTION_SUBJECT_PHRASES = [
+    # Aprobaciones explícitas
+    "transacción aprobada", "transaccion aprobada",
+    "pago aprobado", "pago exitoso", "pago confirmado", "pago realizado",
+    "compra aprobada", "compra realizada", "compra con",
+    "transferencia realizada", "transferencia recibida", "transferencia enviada",
+    "retiro realizado", "retiro en cajero", "retiro en atm",
+    "consignación recibida", "consignacion recibida",
+    "débito realizado", "debito realizado", "cargo realizado",
+    # PSE (frases compuestas — NO la palabra sola)
+    "pse - transacción", "pse - transaccion", "pago con pse", "pago pse",
+    "aprobado por pse", "tu pago fue aprobado", "tu pago ha sido aprobado",
+    "pago exitoso pse", "recibo pse", "transaccion pse",
+    # Recibos y comprobantes (compuestos)
+    "comprobante de pago", "recibo de pago", "factura generada",
+    "confirmacion de pago", "confirmación de pago",
+    "factura electronica", "factura electrónica",
+    "pedido confirmado", "orden confirmada",
+    "débito automático", "debito automatico",
+    # Inglés
+    "payment confirmed", "payment receipt", "payment successful",
+    "order confirmed", "order receipt", "your receipt",
+    "invoice #", "receipt #", "subscription confirmed",
+    # Recargas / nómina
+    "topup", "recarga exitosa", "recarga aprobada",
+    "salary deposit", "nómina acreditada", "nomina acreditada",
+    "te enviaron", "recibiste una transferencia",
+    "movimiento en tu cuenta",
+    # Detalles de pedido (e-commerce)
+    "detalles de tu pedido", "detalles de pedido",
 ]
 
 CATEGORY_MAP = [
@@ -86,14 +139,52 @@ AMOUNT_PATTERNS = [
     r"monto[:\s]+([\d,\.]+)",
 ]
 
-def _is_finance_email(subject: str, snippet: str, body_text: str = "") -> bool:
-    text = (subject + " " + snippet + " " + body_text[:1000]).lower()
-    if any(kw in text for kw in PROMO_KEYWORDS):
+def _is_finance_email(subject: str, snippet: str, body_text: str = "", sender: str = "") -> bool:
+    subj_lower   = subject.lower()
+    sender_lower = sender.lower()
+
+    # 0. PROMO BLACKLIST: descartar inmediatamente — incluso si viene de dominio bancario
+    if any(phrase in subj_lower for phrase in PROMO_SUBJECT_BLACKLIST):
         return False
-    return any(kw in text for kw in FINANCE_KEYWORDS)
+
+    # 1. Remitente de marketing (bancos que también envían newsletters)
+    # Para estos, el ASUNTO debe confirmar la transacción
+    is_marketing_sender = any(d in sender_lower for d in MARKETING_SENDER_DOMAINS)
+    if is_marketing_sender:
+        return any(phrase in subj_lower for phrase in TRANSACTION_SUBJECT_PHRASES)
+
+    # 2. Dominio bancario/pago confiable → aceptar si el asunto no es promo
+    if any(domain in sender_lower for domain in BANK_SENDER_DOMAINS):
+        return True
+
+    # 3. Asunto con frase de transacción explicit
+    if any(phrase in subj_lower for phrase in TRANSACTION_SUBJECT_PHRASES):
+        return True
+
+    # 4. Fallback: snippet/body con múltiples señales MUY específicas de PSE/transacción
+    # (para correos cuyo asunto es genérico pero el cuerpo confirma el pago)
+    combined = (snippet + " " + body_text[:2000]).lower()
+    STRONG_BODY_SIGNALS = [
+        "empresa:",           # formato clásico de correo PSE
+        "descripción:",
+        "descripcion:",
+        "referencia pse",
+        "no. aprobacion",
+        "número de aprobación",
+        "codigo de transaccion",
+        "código de transacción",
+        "achcolombia",
+        "pagos.achcolombia",
+    ]
+    strong_hits = sum(1 for sig in STRONG_BODY_SIGNALS if sig in combined)
+    if strong_hits >= 2 and _extract_amount(snippet + " " + body_text[:2000]):
+        return True
+
+    return False
 
 def _extract_amount(text: str) -> float | None:
-    text = text.replace("&nbsp;", " ").replace("Â", "").replace("Ã", "")
+    text = text.replace("&nbsp;", " ").replace("\xa0", " ").replace("Â", "").replace("Ã", "")
+    text = _html.unescape(text)  # decodifica &#36; → $,  &#46; → .  etc.
     for pattern in AMOUNT_PATTERNS:
         match = re.search(pattern, text, re.IGNORECASE)
         if match:
@@ -192,9 +283,10 @@ def _emails_to_transactions(emails: list) -> list:
         snippet   = email.get("snippet") or ""
         sender    = email.get("sender")  or ""
         body      = email.get("bodyHtml") or email.get("bodyText") or ""
+        body = re.sub(r'<(style|script)[^>]*>.*?</(style|script)>', ' ', body, flags=re.DOTALL | re.IGNORECASE)
         body_text = re.sub(r'<[^>]+>', ' ', body)
 
-        if not _is_finance_email(subject, snippet, body_text):
+        if not _is_finance_email(subject, snippet, body_text, sender=sender):
             continue
 
         text   = subject + " " + snippet + " " + body_text[:2000]
@@ -202,7 +294,7 @@ def _emails_to_transactions(emails: list) -> list:
         if not amount:
             continue
 
-        received_at = email.get("receivedAt") or datetime.utcnow().isoformat()
+        received_at = email.get("receivedAt") or datetime.now(timezone.utc).isoformat()
         try:
             date_str = datetime.fromisoformat(received_at.replace("Z", "+00:00")).strftime("%b %d, %Y")
         except Exception:
@@ -233,11 +325,55 @@ def _emails_to_transactions(emails: list) -> list:
 
     seen, unique = set(), []
     for t in transactions:
-        key = (round(t['amount'], 0), t['date'])
+        # Usar amount + date + primeros 30 chars del nombre para evitar eliminar
+        # transacciones legítimas del mismo monto en el mismo día (ej: dos recargas)
+        name_key = t['name'][:30].strip().lower()
+        key = (round(t['amount'], 0), t['date'], name_key)
         if key not in seen:
             seen.add(key)
             unique.append(t)
     return unique
+
+
+@router.get("/finance/debug-pse")
+def debug_pse(request: Request):
+    """Diagnóstico: muestra emails PSE/achcolombia en la DB y por qué fallan."""
+    token   = request.headers.get("Authorization")
+    user_id = request.headers.get("X-User-Id") or resolve_user_id(token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="user_id required")
+    try:
+        resp = _requests.get(f"{GMAIL_SERVICE_URL}/emails", params={"userId": user_id}, timeout=10)
+        resp.raise_for_status()
+        emails = resp.json() or []
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+    pse = [e for e in emails
+           if "achcolombia" in (e.get("sender") or "").lower()
+           or "pse" in (e.get("subject") or "").lower()
+           or "serviciopse" in (e.get("sender") or "").lower()]
+
+    results = []
+    for e in pse:
+        sender  = e.get("sender") or ""
+        subject = e.get("subject") or ""
+        snippet = e.get("snippet") or ""
+        body    = e.get("bodyHtml") or e.get("bodyText") or ""
+        body    = re.sub(r'<(style|script)[^>]*>.*?</(style|script)>', ' ', body, flags=re.DOTALL | re.IGNORECASE)
+        body_text = re.sub(r'<[^>]+>', ' ', body)
+        text    = subject + " " + snippet + " " + body_text[:3000]
+        amount  = _extract_amount(text)
+        results.append({
+            "sender":       sender[:80],
+            "subject":      subject[:80],
+            "body_len":     len(body),
+            "body_preview": body_text[:300].strip(),
+            "amount":       amount,
+            "is_finance":   _is_finance_email(subject, snippet, body_text, sender=sender),
+        })
+
+    return {"total_emails": len(emails), "pse_count": len(pse), "pse_emails": results}
 
 
 @router.get("/finance/transactions", response_model=FinanceTransactionsListResponse)
@@ -272,17 +408,29 @@ def sync_finance_transactions(request: Request):
     if not user_id:
         raise HTTPException(status_code=401, detail="user_id required")
 
-    # 1. Disparar sync en Gmail-service (trae correos nuevos a la DB)
+    # 1. Disparar sync en Gmail-service en background para no bloquear por timeout
     sync_warning = None
-    try:
-        _requests.get(
-            f"{GMAIL_SERVICE_URL}/emails/sync",
-            params={"userId": user_id},
-            timeout=30,
-        ).raise_for_status()
-    except Exception as e:
-        logger.warning(f"Gmail sync parcial o fallido, usando cache: {e}")
-        sync_warning = "Gmail sync failed — showing cached data. Reconnect your Google account in Apps."
+    sync_error_holder: list[str] = []
+
+    def _do_sync():
+        try:
+            r = _requests.get(
+                f"{GMAIL_SERVICE_URL}/emails/sync",
+                params={"userId": user_id},
+                timeout=60,
+            )
+            r.raise_for_status()
+            logger.info(f"Gmail sync OK for user {user_id}: {r.text[:200]}")
+        except Exception as exc:
+            logger.warning(f"Gmail sync failed for user {user_id}: {exc}")
+            sync_error_holder.append(str(exc)[:120])
+
+    t = threading.Thread(target=_do_sync, daemon=True)
+    t.start()
+    t.join(timeout=90)
+
+    if sync_error_holder:
+        sync_warning = f"Gmail sync warning: {sync_error_holder[0]}"
 
     # 2. Leer emails actualizados de la DB
     try:
@@ -299,56 +447,6 @@ def sync_finance_transactions(request: Request):
 
     transactions = _emails_to_transactions(emails)
     return {"transactions": transactions, "total": len(transactions), "synced_from": "gmail", "sync_warning": sync_warning}
-
-
-@router.get("/finance/debug")
-def debug_finance_emails(request: Request):
-    """Diagnóstico: muestra por qué cada email es incluido o filtrado."""
-    token = request.headers.get("Authorization")
-    user_id = request.headers.get("X-User-Id") or resolve_user_id(token)
-    if not user_id:
-        raise HTTPException(status_code=401, detail="user_id required")
-
-    try:
-        resp = _requests.get(f"{GMAIL_SERVICE_URL}/emails", params={"userId": user_id}, timeout=10)
-        resp.raise_for_status()
-        emails = resp.json() or []
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=str(e))
-
-    results = []
-    for email in emails:
-        subject   = email.get("subject") or ""
-        snippet   = email.get("snippet") or ""
-        body      = email.get("bodyHtml") or email.get("bodyText") or ""
-        body_text = re.sub(r'<[^>]+>', ' ', body)
-        text      = (subject + " " + snippet + " " + body_text[:1000]).lower()
-
-        hit_promo   = [kw for kw in PROMO_KEYWORDS if kw in text]
-        hit_finance = [kw for kw in FINANCE_KEYWORDS if kw in text]
-        is_finance  = not hit_promo and bool(hit_finance)
-        amount      = _extract_amount(subject + " " + snippet + " " + body_text[:2000]) if is_finance else None
-
-        received_at = email.get("receivedAt", "")
-        try:
-            date_str = datetime.fromisoformat(received_at.replace("Z", "+00:00")).strftime("%b %d, %Y")
-        except Exception:
-            date_str = received_at[:10]
-
-        results.append({
-            "id":           email.get("id") or email.get("gmailId"),
-            "date":         date_str,
-            "subject":      subject[:80],
-            "snippet":      snippet[:120],
-            "included":     is_finance and amount is not None,
-            "reason":       "ok" if (is_finance and amount) else
-                            f"promo_keywords: {hit_promo}" if hit_promo else
-                            "no_finance_keywords" if not hit_finance else
-                            "no_amount",
-            "amount":       amount,
-        })
-
-    return {"total_emails": len(emails), "included": sum(1 for r in results if r["included"]), "emails": results}
 
 
 class AgentRunRequest(BaseModel):
@@ -541,6 +639,15 @@ def clear_memory(request: Request):
     user_id = request.headers.get("X-User-Id") or resolve_user_id(token)
     deleted = agent.memory_store.clear_memory(user_id)
     return {"user_id": user_id, "deleted": deleted}
+
+
+@router.delete("/agent/tasks")
+def clear_tasks_endpoint(request: Request):
+    """Clear user's agent tasks."""
+    token   = request.headers.get("Authorization")
+    user_id = request.headers.get("X-User-Id") or resolve_user_id(token)
+    clear_tasks(user_id)
+    return {"status": "tasks cleared"}
 
 
 @router.get("/agent/plan", response_model=PlanInfoResponse)

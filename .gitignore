@@ -458,3 +458,6 @@ docker-compose.override.yml
 frontend/.env
 
 IA-service/.env
+
+IA-service/logs/
+IA-service/data/

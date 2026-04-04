@@ -230,6 +230,7 @@ export default function FinancePage() {
   const [hovTx,        setHovTx]        = useState<string | null>(null)
   const [loading,      setLoading]      = useState(false)
   const [syncWarning,  setSyncWarning]  = useState<string | null>(null)
+  const [syncPhase,    setSyncPhase]    = useState<string>('')
 
   // Picker state — managed in FinancePage so it always sees latest categoryDefs
   const [picker, setPicker] = useState<{
@@ -253,15 +254,11 @@ export default function FinancePage() {
   }
 
   const loadTransactions = (defs: CategoryDef[] = categoryDefs) => {
-    
     setLoading(true)
     getTransactions().then(txs => {
       setTransactions(txs)
       recalc(txs, defs)
       setLoading(false)
-    const cats = getDerivedCategories(txs, categoryDefs)
-    console.log('CATS JSON:', JSON.stringify(cats))
-    setCategories(cats)
     })
   }
 
@@ -421,10 +418,20 @@ export default function FinancePage() {
             <button onClick={() => {
               setLoading(true)
               setSyncWarning(null)
+              setSyncPhase('Fetching emails from Gmail...')
+              const phaseTimer = setInterval(() => {
+                setSyncPhase(p =>
+                  p === 'Fetching emails from Gmail...' ? 'Processing transactions...' :
+                  p === 'Processing transactions...'    ? 'Parsing amounts...' :
+                  'Almost done...'
+                )
+              }, 8000)
               syncTransactions().then(({ transactions: txs, warning }) => {
+                clearInterval(phaseTimer)
                 setTransactions(txs)
                 recalc(txs, categoryDefs)
                 setSyncWarning(warning)
+                setSyncPhase('')
                 setLoading(false)
               })
             }} disabled={loading} style={{
@@ -448,7 +455,16 @@ export default function FinancePage() {
             }}>✕</button>
           </div>
         )}
-        {transactions.slice(0, 8).map(tx => <TxRow key={tx.id} tx={tx} {...txRowProps} />)}
+        {loading ? (
+          <div style={{ fontSize: 12, color: '#8C6A3E', padding: '14px 0', textAlign: 'center' as const }}>
+            {syncPhase || 'Loading...'}
+          </div>
+        ) : transactions.length === 0 ? (
+          <div style={{ textAlign: 'center' as const, padding: '24px 0' }}>
+            <div style={{ fontSize: 13, color: '#8C6A3E', marginBottom: 8 }}>No transactions yet</div>
+            <div style={{ fontSize: 11, color: '#555' }}>Click ↻ Sync to load your financial emails</div>
+          </div>
+        ) : transactions.slice(0, 8).map(tx => <TxRow key={tx.id} tx={tx} {...txRowProps} />)}
       </DashCard>
 
       {/* Floating Category Picker — rendered in FinancePage so it always sees latest state */}
