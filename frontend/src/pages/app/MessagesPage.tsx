@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import DashCard from '../../components/ui/DashCard'
-import { getMessages, summarizeMessage, suggestReply, sendReply, syncMessages, formatEmailDate, type Message } from '../../api/messages'
+import { getMessages, summarizeMessage, suggestReply, sendReply, syncMessages, formatEmailDate, telegramSendMessage, type Message } from '../../api/messages'
 
 const SOURCE_COLORS: Record<string, string> = {
-  gmail: '#c47070',
-  slack: '#6a9ab0',
+  gmail:    '#c47070',
+  telegram: '#5b9bd5',
 }
 
 function PulseLoader() {
@@ -26,7 +26,7 @@ export default function MessagesPage() {
   const [messages, setMessages]         = useState<Message[]>([])
   const [selected, setSelected]         = useState<Message | null>(null)
   const [filter, setFilter]             = useState<'all' | 'unread' | 'urgent'>('all')
-  const [source, setSource]             = useState<'all' | 'gmail'>('all')
+  const [source, setSource]             = useState<'all' | 'gmail' | 'telegram'>('all')
   const [loading, setLoading]           = useState(true)
   const [summary, setSummary]           = useState('')
   const [summaryLoading, setSummaryLoading] = useState(false)
@@ -73,7 +73,6 @@ export default function MessagesPage() {
     setReplyText('')
     setSent(false)
     setSendError(null)
-    // Mark as read
     setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, read: true } : m))
   }
 
@@ -91,7 +90,11 @@ export default function MessagesPage() {
     setSent(false)
     setSendError(null)
     try {
-      await sendReply(selected.email, `Re: ${selected.subject}`, replyText)
+      if (selected.source === 'telegram' && selected.chat_id) {
+        await telegramSendMessage(selected.chat_id, replyText)
+      } else {
+        await sendReply(selected.email, `Re: ${selected.subject}`, replyText)
+      }
       setReplyText('')
       setSent(true)
       setTimeout(() => setSent(false), 3000)
@@ -173,16 +176,16 @@ export default function MessagesPage() {
           </div>
 
           {/* Source filters */}
-          <div style={{ display: 'flex', gap: 5 }}>
-            {(['all', 'gmail'] as const).map(s => (
+          <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap' }}>
+            {(['all', 'gmail', 'telegram'] as const).map(s => (
               <button key={s} onClick={() => setSource(s)} style={{
                 fontSize: 9, padding: '2px 8px', borderRadius: 10, cursor: 'pointer',
                 fontFamily: 'inherit',
-                border: source === s ? `1px solid ${s === 'gmail' ? '#c47070' : '#C6A15B'}` : '1px solid rgba(198,161,91,0.12)',
+                border: source === s ? `1px solid ${SOURCE_COLORS[s] ?? '#C6A15B'}` : '1px solid rgba(198,161,91,0.12)',
                 background: 'transparent',
-                color: source === s ? (s === 'gmail' ? '#c47070' : '#C6A15B') : '#8C6A3E',
+                color: source === s ? (SOURCE_COLORS[s] ?? '#C6A15B') : '#8C6A3E',
               }}>
-                {s === 'all' ? '● All' : '● Gmail'}
+                {s === 'all' ? '● All' : s === 'gmail' ? '● Gmail' : '● Telegram'}
               </button>
             ))}
           </div>

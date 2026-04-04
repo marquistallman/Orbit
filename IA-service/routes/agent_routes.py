@@ -1,4 +1,5 @@
 import os
+import asyncio
 from typing import Any
 from datetime import datetime
 from enum import Enum
@@ -13,6 +14,8 @@ from tools.registry import get_tools
 from tools.tool_selector import select_tool
 from tools.tool_executor import execute_tool
 from utils.logger import logger
+from telegram.session_store import TelegramSessionStore
+import telegram.client as _tg
 
 import re
 import html as _html
@@ -25,6 +28,10 @@ router = APIRouter()
 agent = Agent()
 plan_catalog = PlanCatalog()
 usage_store = UsageStore(os.getenv("USAGE_DB_PATH", os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "usage.db")))
+_tg_sessions = TelegramSessionStore(os.getenv(
+    "TELEGRAM_SESSION_DB_PATH",
+    os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "telegram_sessions.db")
+))
 
 GMAIL_SERVICE_URL = os.getenv("GMAIL_SERVICE_URL", "http://localhost:8082")
 
@@ -732,7 +739,7 @@ _URGENT_KEYWORDS = ["urgent", "urgente", "asap", "critical", "crítico",
 
 
 @router.get("/messages")
-def get_messages(request: Request):
+async def get_messages(request: Request):
     token   = request.headers.get("Authorization")
     user_id = request.headers.get("X-User-Id") or resolve_user_id(token)
     if not user_id:
@@ -772,6 +779,29 @@ def get_messages(request: Request):
             "urgent":  is_urgent,
         })
 
+    # Agregar mensajes de Telegram si el usuario tiene sesión
+    tg_session = _tg_sessions.get(user_id)
+    if tg_session:
+        try:
+            tg_msgs = await _tg.fetch_messages(tg_session)
+            for m in tg_msgs:
+                messages.append({
+                    "id":      m["id"],
+                    "from":    m["from"],
+                    "email":   "",
+                    "chat_id": m.get("chat_id", ""),
+                    "subject": m["subject"],
+                    "preview": m["preview"],
+                    "body":    m["body"],
+                    "date":    m["date"],
+                    "source":  "telegram",
+                    "read":    m.get("read", True),
+                    "urgent":  False,
+                })
+        except Exception as e:
+            logger.warning(f"Telegram fetch failed for {user_id}: {e}")
+
+    messages.sort(key=lambda m: m.get("date") or "", reverse=True)
     return {"messages": messages, "total": len(messages)}
 
 
@@ -793,3 +823,106 @@ def send_message(request: Request, payload: SendMessageRequest):
         return {"status": "sent"}
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Gmail send error: {str(e)}")
+
+
+# ─────────────────────────────────────────────
+#  TELEGRAM
+# ─────────────────────────────────────────────
+
+class TelegramAuthStartRequest(BaseModel):
+    phone: str
+
+class TelegramAuthVerifyRequest(BaseModel):
+    code: str
+    password: str = ""
+
+class TelegramSendRequest(BaseModel):
+    chat_id: str
+    text: str
+
+
+@router.get("/telegram/status")
+async def telegram_status(request: Request):
+    token   = request.headers.get("Authorization")
+    user_id = request.headers.get("X-User-Id") or resolve_user_id(token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="user_id required")
+    return {
+        "configured": _tg.is_configured(),
+        "connected":  _tg_sessions.has_session(user_id),
+    }
+
+
+@router.post("/telegram/auth/start")
+async def telegram_auth_start(request: Request, body: TelegramAuthStartRequest):
+    token   = request.headers.get("Authorization")
+    user_id = request.headers.get("X-User-Id") or resolve_user_id(token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="user_id required")
+    if not _tg.is_configured():
+        raise HTTPException(status_code=503, detail="TELEGRAM_API_ID / TELEGRAM_API_HASH no configurados")
+    try:
+        await _tg.start_auth(user_id, body.phone)
+        return {"status": "code_sent", "phone": body.phone}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/telegram/auth/verify")
+async def telegram_auth_verify(request: Request, body: TelegramAuthVerifyRequest):
+    token   = request.headers.get("Authorization")
+    user_id = request.headers.get("X-User-Id") or resolve_user_id(token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="user_id required")
+    try:
+        session_string = await _tg.verify_code(user_id, body.code, body.password or None)
+        _tg_sessions.save(user_id, session_string)
+        return {"status": "connected"}
+    except ValueError as e:
+        if "2FA_REQUIRED" in str(e):
+            raise HTTPException(status_code=428, detail="2FA_REQUIRED")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/telegram/auth/logout")
+async def telegram_auth_logout(request: Request):
+    token   = request.headers.get("Authorization")
+    user_id = request.headers.get("X-User-Id") or resolve_user_id(token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="user_id required")
+    _tg_sessions.delete(user_id)
+    return {"status": "disconnected"}
+
+
+@router.get("/telegram/messages")
+async def get_telegram_messages(request: Request):
+    token   = request.headers.get("Authorization")
+    user_id = request.headers.get("X-User-Id") or resolve_user_id(token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="user_id required")
+    session = _tg_sessions.get(user_id)
+    if not session:
+        return {"messages": [], "connected": False}
+    try:
+        msgs = await _tg.fetch_messages(session)
+        return {"messages": msgs, "connected": True, "total": len(msgs)}
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+
+@router.post("/telegram/send")
+async def telegram_send(request: Request, body: TelegramSendRequest):
+    token   = request.headers.get("Authorization")
+    user_id = request.headers.get("X-User-Id") or resolve_user_id(token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="user_id required")
+    session = _tg_sessions.get(user_id)
+    if not session:
+        raise HTTPException(status_code=403, detail="Telegram no conectado")
+    try:
+        await _tg.send_message(session, body.chat_id, body.text)
+        return {"status": "sent"}
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))

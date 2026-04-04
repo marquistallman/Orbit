@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import DashCard from '../../components/ui/DashCard'
 import OrbitalNucleus from '../../components/orbit/OrbitalNucleus'
 import { getConnectedApps, App } from '../../api/apps'
-import { getMessages, formatEmailDate, type Message } from '../../api/messages'
+import { getMessages, formatEmailDate, getTelegramStatus, type Message } from '../../api/messages'
 
 const IA_URL = import.meta.env.VITE_IA_URL || 'http://localhost:5000'
 
@@ -77,7 +77,19 @@ export default function DashboardPage() {
   const [summaryLoading, setSummaryLoading] = useState(false)
 
   useEffect(() => {
-    getConnectedApps().then(setConnectedApps).catch(() => {})
+    getConnectedApps().then(apps => {
+      getTelegramStatus().then(s => {
+        if (s.connected) {
+          setConnectedApps([{
+            id: 'telegram', name: 'Telegram', description: 'Mensajes personales MTProto',
+            category: 'messaging', status: 'connected', meta: 'Sesión MTProto activa',
+            usage: 0, color: '#5b9bd5', icon: '✈',
+          }, ...apps])
+        } else {
+          setConnectedApps(apps)
+        }
+      }).catch(() => setConnectedApps(apps))
+    }).catch(() => {})
 
     fetch(`${IA_URL}/agent/history`, { headers: authHeaders() })
       .then(r => r.ok ? r.json() : { tasks: [] })
