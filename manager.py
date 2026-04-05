@@ -205,9 +205,6 @@ def is_port_in_use(port):
 
 def list_port_conflicts():
     conflicts = []
-    for port in INFRA_PORTS:
-        if is_port_in_use(port):
-            conflicts.append(port)
     for var in SERVICE_PORT_VARS.values():
         port_str = os.environ.get(var)
         if port_str:
