@@ -625,7 +625,8 @@ def tmux_has_session():
 def start_service_in_tmux(name, command, cwd):
     if not command_exists('tmux'):
         raise RuntimeError('tmux is required to launch services in a terminal session.')
-    shell_command = shlex.join(command)
+    log_file = cwd / f"{name.replace(' ', '_')}.log"
+    shell_command = shlex.join(command) + f' > {log_file} 2>&1'
     if not tmux_has_session():
         args = ['tmux', 'new-session', '-d', '-s', 'orbit', '-n', name, f'cd {shlex.quote(str(cwd))} && {shell_command}']
         code, _ = run_command(args, capture_output=False)

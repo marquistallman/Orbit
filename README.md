@@ -111,12 +111,12 @@ Services start in tmux sessions. Frontend available at the assigned port (check 
 
 10. **Monitor**
     - Status: `python3 manager.py --status`
-    - Logs: `tmux attach -t <service-name>`
+    - Logs: `tmux attach -t <service-name>` or check `<service-dir>/<Service_Name>.log` (e.g., `auth-service/Auth_Service.log`)
     - Metrics: Grafana at port 3000
 
 ### Troubleshooting
 - **Port conflicts**: Manager assigns free ports, but check with `netstat -tlnp`
-- **Services fail**: Check logs in tmux: `tmux attach -t <service>`
+- **Services fail**: Check logs in tmux: `tmux attach -t <service>` or review log files in each service directory (e.g., `auth-service/Auth_Service.log`)
 - **Dependencies missing**: Run `--bootstrap` again
 - **Permissions**: Ensure user can bind to ports <1024 if needed, or use high ports
 - **Firewall**: `sudo ufw allow <port>` for assigned ports
