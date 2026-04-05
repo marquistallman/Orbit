@@ -637,6 +637,9 @@ def start_service_in_tmux(name, command, cwd):
     code, _ = run_command(args, capture_output=False)
     if code != 0:
         raise RuntimeError(f'Failed to start tmux window for {name}')
+
+
+def start_service(service):
     for port in service['ports']():
         if is_port_in_use(port):
             raise RuntimeError(f"{service['name']} cannot start because port {port} is already in use.")
