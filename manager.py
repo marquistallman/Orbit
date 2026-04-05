@@ -269,7 +269,6 @@ def ensure_env_files():
             'CODE_SNIPPETS_DB_PATH=/data/snippets.db\n'
             'CONNECTOR_DELIVERY_ENABLED=false\n'
             'DELIVERY_API_URL=\n'
-'
             'DELIVERY_API_KEY=\n'
             'CONNECTOR_WHATSAPP_ENABLED=false\n'
             'WHATSAPP_PROVIDER=\n'
