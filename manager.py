@@ -150,46 +150,48 @@ def check_or_create_frontend_env():
     frontend_dir = "frontend"
     env_path = os.path.join(frontend_dir, ".env")
     
-    if os.path.exists(frontend_dir):
-        if not os.path.exists(env_path):
-            with open(env_path, "w") as f:
-                f.write("VITE_API_URL=http://localhost:12001\n")
-                f.write("VITE_IA_URL=http://localhost:12002\n")
-                f.write("VITE_GMAIL_URL=http://localhost:12003\n")
-                f.write("VITE_DOC_URL=http://localhost:12004\n")
-                f.write("VITE_EXCEL_URL=http://localhost:12005\n")
-                f.write("VITE_CODE_URL=http://localhost:12006\n")
-                f.write("VITE_MINI_MAPS_URL=http://localhost:12007\n")
-                f.write("VITE_DELIVERY_URL=\n")
-                f.write("VITE_RESERVATIONS_URL=\n")
-                f.write("VITE_TRANSPORT_URL=\n")
-                f.write("VITE_BROKER_URL=\n")
-                f.write("VITE_BANK_URL=\n")
-                f.write("VITE_TELEGRAM_URL=\n")
-                f.write("VITE_WHATSAPP_URL=\n")
-            print(f"Created {env_path} with default values.")
-        
-        # Ensure ignored in root .gitignore
-        add_to_gitignore("frontend/.env")
-    else:
-        print("Warning: frontend directory not found.")
+    # Create frontend dir if it doesn't exist
+    if not os.path.exists(frontend_dir):
+        os.makedirs(frontend_dir, exist_ok=True)
+    
+    if not os.path.exists(env_path):
+        with open(env_path, "w") as f:
+            f.write("VITE_API_URL=http://localhost:12001\n")
+            f.write("VITE_IA_URL=http://localhost:12002\n")
+            f.write("VITE_GMAIL_URL=http://localhost:12003\n")
+            f.write("VITE_DOC_URL=http://localhost:12004\n")
+            f.write("VITE_EXCEL_URL=http://localhost:12005\n")
+            f.write("VITE_CODE_URL=http://localhost:12006\n")
+            f.write("VITE_MINI_MAPS_URL=http://localhost:12007\n")
+            f.write("VITE_DELIVERY_URL=\n")
+            f.write("VITE_RESERVATIONS_URL=\n")
+            f.write("VITE_TRANSPORT_URL=\n")
+            f.write("VITE_BROKER_URL=\n")
+            f.write("VITE_BANK_URL=\n")
+            f.write("VITE_TELEGRAM_URL=\n")
+            f.write("VITE_WHATSAPP_URL=\n")
+        print(f"Created {env_path} with default values.")
+    
+    # Ensure ignored in root .gitignore
+    add_to_gitignore("frontend/.env")
 
 def check_or_create_ia_env():
     """Checks for IA-service/.env and creates it if not found, and adds it to .gitignore."""
     ia_dir = "IA-service"
     env_path = os.path.join(ia_dir, ".env")
     
-    if os.path.exists(ia_dir):
-        if not os.path.exists(env_path):
-            with open(env_path, "w") as f:
-                f.write("OPENROUTER_API_KEY=your_api_key_here\n")
-                f.write("TOKEN_VAULT_URL=http://localhost:12001\n")
-            print(f"Created {env_path} with default values.")
-        
-        # Ensure ignored in root .gitignore
-        add_to_gitignore("IA-service/.env")
-    else:
-        print("Warning: IA-service directory not found.")
+    # Create IA-service dir if it doesn't exist
+    if not os.path.exists(ia_dir):
+        os.makedirs(ia_dir, exist_ok=True)
+    
+    if not os.path.exists(env_path):
+        with open(env_path, "w") as f:
+            f.write("OPENROUTER_API_KEY=your_api_key_here\n")
+            f.write("TOKEN_VAULT_URL=http://localhost:12001\n")
+        print(f"Created {env_path} with default values.")
+    
+    # Ensure ignored in root .gitignore
+    add_to_gitignore("IA-service/.env")
 
 def add_to_gitignore(entry):
     """Adds a pattern to .gitignore if it doesn't exist."""
@@ -255,28 +257,28 @@ def run_command(command):
     input("\nPress Enter to continue...")
 
 def start_service(service_name):
-    """Starts a specific service using docker-compose."""
-    command = f"docker-compose up -d --build {service_name}"
+    """Starts a specific service using docker compose."""
+    command = f"docker compose up -d --build {service_name}"
     run_command(command)
 
 def stop_service(service_name):
-    """Stops a specific service using docker-compose."""
-    command = f"docker-compose stop {service_name}"
+    """Stops a specific service using docker compose."""
+    command = f"docker compose stop {service_name}"
     run_command(command)
 
 def start_all_services():
-    """Starts all services using docker-compose."""
-    command = "docker-compose up -d --build"
+    """Starts all services using docker compose."""
+    command = "docker compose up -d --build"
     run_command(command)
     
 def stop_all_services():
     """Stops all running services."""
-    command = "docker-compose down"
+    command = "docker compose down"
     run_command(command)
 
 def build_service(service_name):
-    """Builds a specific service using docker-compose."""
-    command = f"docker-compose build {service_name}"
+    """Builds a specific service using docker compose."""
+    command = f"docker compose build {service_name}"
     run_command(command)
 
 SERVICES = [
@@ -331,6 +333,18 @@ def update_env_variable(file_path, key):
     input("\nPress Enter to continue...")
 
 def menu_configure_secrets():
+    root_vars = [
+        "OPENROUTER_API_KEY", "JWT_SECRET", "POSTGRES_PASSWORD",
+        "GRAFANA_ADMIN_PASSWORD", "OPENROUTER_MODEL"
+    ]
+    frontend_vars = [
+        "VITE_API_URL", "VITE_IA_URL", "VITE_GMAIL_URL", "VITE_DOC_URL",
+        "VITE_EXCEL_URL", "VITE_CODE_URL", "VITE_MINI_MAPS_URL"
+    ]
+    ia_vars = [
+        "OPENROUTER_API_KEY", "TOKEN_VAULT_URL"
+    ]
+    
     while True:
         options = [
             "Update Root .env (OpenRouter, JWT, etc.)",
@@ -341,11 +355,22 @@ def menu_configure_secrets():
         choice = pick("Configure Secrets", options)
         if choice == 3: break
         
-        path = ".env" if choice == 0 else (os.path.join("frontend", ".env") if choice == 1 else os.path.join("IA-service", ".env"))
-        clear_screen()
-        print_header(f"Editing {path}")
-        key = input("Enter the variable name to update (e.g. OPENROUTER_API_KEY): ").strip()
-        if key: update_env_variable(path, key)
+        if choice == 0:
+            path = ".env"
+            vars_list = root_vars
+        elif choice == 1:
+            path = os.path.join("frontend", ".env")
+            vars_list = frontend_vars
+        else:
+            path = os.path.join("IA-service", ".env")
+            vars_list = ia_vars
+        
+        var_choice = pick(f"Select variable in {path}", vars_list + ["Back"])
+        if var_choice == len(vars_list):
+            continue
+        
+        key = vars_list[var_choice]
+        update_env_variable(path, key)
 
 def main_loop():
     check_or_create_env_file()
