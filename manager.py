@@ -639,7 +639,7 @@ def start_service_in_tmux(name, command, cwd):
 
 
 def start_service(service):
-    for port in service['ports']:
+    for port in service['ports']():
         if is_port_in_use(port):
             raise RuntimeError(f"{service['name']} cannot start because port {port} is already in use.")
     env = merged_env()
