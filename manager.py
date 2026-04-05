@@ -323,6 +323,8 @@ def config_env():
     """Interactive environment configuration."""
     env = merged_env()
     local_env_path = ROOT / '.env.local'
+    frontend_env = ROOT / 'frontend' / '.env'
+    ia_env = ROOT / 'IA-service' / '.env'
 
     if console:
         console.print('[bold blue]Orbit Environment Configuration[/bold blue]')
@@ -457,10 +459,16 @@ def bootstrap_auth():
     auth_dir = ROOT / 'auth-service'
     if not auth_dir.exists():
         return
-    mvn = get_auth_command()[0]
-    if not command_exists(mvn) and not command_exists('mvn'):
-        raise RuntimeError('Maven is required for auth-service')
-    result, _ = run_command([mvn, '-q', '-B', '-DskipTests', 'dependency:resolve'], cwd=auth_dir, capture_output=False)
+    mvnw_path = auth_dir / 'mvnw'
+    if not mvnw_path.exists():
+        raise RuntimeError('mvnw not found in auth-service directory')
+    # Make mvnw executable
+    if platform.system() != 'Windows':
+        result, _ = run_command(['chmod', '+x', str(mvnw_path)], capture_output=True)
+        if result != 0:
+            raise RuntimeError('Failed to make mvnw executable')
+    # Use mvnw directly
+    result, _ = run_command(['./mvnw', '-q', '-B', '-DskipTests', 'dependency:resolve'], cwd=auth_dir, capture_output=False)
     if result != 0:
         raise RuntimeError('Failed to resolve auth-service Maven dependencies')
 
