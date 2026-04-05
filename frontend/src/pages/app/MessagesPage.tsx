@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import DashCard from '../../components/ui/DashCard'
-import { getMessages, summarizeMessage, suggestReply, sendReply, type Message } from '../../api/messages'
+import { getMessages, summarizeMessage, suggestReply, sendReply, syncMessages, formatEmailDate, telegramSendMessage, type Message } from '../../api/messages'
 
 const SOURCE_COLORS: Record<string, string> = {
-  gmail: '#c47070',
-  slack: '#6a9ab0',
+  gmail:    '#c47070',
+  telegram: '#5b9bd5',
 }
 
 function PulseLoader() {
@@ -26,7 +26,7 @@ export default function MessagesPage() {
   const [messages, setMessages]         = useState<Message[]>([])
   const [selected, setSelected]         = useState<Message | null>(null)
   const [filter, setFilter]             = useState<'all' | 'unread' | 'urgent'>('all')
-  const [source, setSource]             = useState<'all' | 'gmail'>('all')
+  const [source, setSource]             = useState<'all' | 'gmail' | 'telegram'>('all')
   const [loading, setLoading]           = useState(true)
   const [summary, setSummary]           = useState('')
   const [summaryLoading, setSummaryLoading] = useState(false)
@@ -35,6 +35,7 @@ export default function MessagesPage() {
   const [sending,   setSending]         = useState(false)
   const [sent,      setSent]            = useState(false)
   const [sendError, setSendError]       = useState<string | null>(null)
+  const [syncing,   setSyncing]         = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
@@ -52,13 +53,26 @@ export default function MessagesPage() {
     })
   }, [])
 
+  const handleSync = async () => {
+    setSyncing(true)
+    try {
+      await syncMessages()
+      const msgs = await getMessages()
+      setMessages(msgs)
+      if (!selected) setSelected(msgs[0] ?? null)
+    } catch {
+      // sync failed silently
+    } finally {
+      setSyncing(false)
+    }
+  }
+
   const handleSelect = (msg: Message) => {
     setSelected(msg)
     setSummary('')
     setReplyText('')
     setSent(false)
     setSendError(null)
-    // Mark as read
     setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, read: true } : m))
   }
 
@@ -76,7 +90,11 @@ export default function MessagesPage() {
     setSent(false)
     setSendError(null)
     try {
-      await sendReply(selected.email, `Re: ${selected.subject}`, replyText)
+      if (selected.source === 'telegram' && selected.chat_id) {
+        await telegramSendMessage(selected.chat_id, replyText)
+      } else {
+        await sendReply(selected.email, `Re: ${selected.subject}`, replyText)
+      }
       setReplyText('')
       setSent(true)
       setTimeout(() => setSent(false), 3000)
@@ -122,12 +140,24 @@ export default function MessagesPage() {
         <DashCard style={{ padding: '12px 14px', flexShrink: 0 }} speed={0.0004}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: '#EDE6D6' }}>Mensajes</div>
-            {unreadCount > 0 && (
-              <div style={{
-                fontSize: 9, background: 'rgba(198,161,91,0.15)', color: '#C6A15B',
-                border: '1px solid rgba(198,161,91,0.3)', borderRadius: 10, padding: '2px 7px',
-              }}>{unreadCount} sin leer</div>
-            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {unreadCount > 0 && (
+                <div style={{
+                  fontSize: 9, background: 'rgba(198,161,91,0.15)', color: '#C6A15B',
+                  border: '1px solid rgba(198,161,91,0.3)', borderRadius: 10, padding: '2px 7px',
+                }}>{unreadCount} sin leer</div>
+              )}
+              <button onClick={handleSync} disabled={syncing} style={{
+                fontSize: 10, padding: '3px 10px', borderRadius: 5, cursor: syncing ? 'not-allowed' : 'pointer',
+                fontFamily: 'inherit',
+                border: '1px solid rgba(198,161,91,0.3)',
+                background: 'rgba(198,161,91,0.08)',
+                color: '#C6A15B',
+                opacity: syncing ? 0.6 : 1,
+              }}>
+                {syncing ? 'Sync...' : '↻ Sync'}
+              </button>
+            </div>
           </div>
 
           {/* Status filters */}
@@ -146,16 +176,16 @@ export default function MessagesPage() {
           </div>
 
           {/* Source filters */}
-          <div style={{ display: 'flex', gap: 5 }}>
-            {(['all', 'gmail'] as const).map(s => (
+          <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap' }}>
+            {(['all', 'gmail', 'telegram'] as const).map(s => (
               <button key={s} onClick={() => setSource(s)} style={{
                 fontSize: 9, padding: '2px 8px', borderRadius: 10, cursor: 'pointer',
                 fontFamily: 'inherit',
-                border: source === s ? `1px solid ${s === 'gmail' ? '#c47070' : '#C6A15B'}` : '1px solid rgba(198,161,91,0.12)',
+                border: source === s ? `1px solid ${SOURCE_COLORS[s] ?? '#C6A15B'}` : '1px solid rgba(198,161,91,0.12)',
                 background: 'transparent',
-                color: source === s ? (s === 'gmail' ? '#c47070' : '#C6A15B') : '#8C6A3E',
+                color: source === s ? (SOURCE_COLORS[s] ?? '#C6A15B') : '#8C6A3E',
               }}>
-                {s === 'all' ? '● All' : '● Gmail'}
+                {s === 'all' ? '● All' : s === 'gmail' ? '● Gmail' : '● Telegram'}
               </button>
             ))}
           </div>
@@ -184,7 +214,7 @@ export default function MessagesPage() {
                 <span style={{ fontSize: 11, color: msg.read ? '#8C6A3E' : '#EDE6D6', fontWeight: msg.read ? 400 : 600 }}>
                   {msg.from}
                 </span>
-                <span style={{ fontSize: 9, color: '#8C6A3E' }}>{msg.date}</span>
+                <span style={{ fontSize: 9, color: '#8C6A3E' }}>{formatEmailDate(msg.date)}</span>
               </div>
               <div style={{ fontSize: 11, color: '#EDE6D6', marginBottom: 3, fontWeight: msg.read ? 400 : 500 }}>
                 {msg.subject}
@@ -226,7 +256,7 @@ export default function MessagesPage() {
               <span style={{ fontSize: 11, color: '#8C6A3E' }}>
                 De: <span style={{ color: '#C6A15B' }}>{selected.from}</span> · {selected.email}
               </span>
-              <span style={{ fontSize: 10, color: '#8C6A3E' }}>{selected.date}</span>
+              <span style={{ fontSize: 10, color: '#8C6A3E' }}>{formatEmailDate(selected.date)}</span>
             </div>
 
             {/* Action buttons */}

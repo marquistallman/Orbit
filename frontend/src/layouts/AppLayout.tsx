@@ -2,14 +2,14 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 
 const NAV = [
-  { to: '/app/apps',     label: 'Apps'      },
-  { to: '/app/agent',    label: 'Agent'     },
+  { to: '/app',           label: 'Dashboard' },
+  { to: '/app/profile',   label: 'Profile'   },
+  { to: '/app/agent',     label: 'Agent'     },
+  { to: '/app/finance',   label: 'Finance'   },
+  { to: '/app/messages',  label: 'Messages'  },
+  { to: '/app/apps',      label: 'Apps'      },
+  { to: '/app/labs',      label: 'Labs'      },
   { to: '/app/documents', label: 'Docs'      },
-  { to: '/app/labs',     label: 'Labs'      },
-  { to: '/app/finance',  label: 'Finance'   },
-  { to: '/app/messages', label: 'Messages'  },
-  { to: '/app',          label: 'Dashboard' },
-  { to: '/app/profile',  label: 'Profile'   },
 ]
 
 export default function AppLayout() {

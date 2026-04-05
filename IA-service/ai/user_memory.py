@@ -156,6 +156,8 @@ class UserMemoryStore:
         return "\n".join(lines)
 
 
+_UUID_RE = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', re.IGNORECASE)
+
 def resolve_user_id(token: str | None, fallback: str = "anonymous") -> str:
     if not token:
         return fallback
@@ -167,6 +169,12 @@ def resolve_user_id(token: str | None, fallback: str = "anonymous") -> str:
         padding = "=" * (-len(payload_part) % 4)
         decoded = base64.urlsafe_b64decode(payload_part + padding).decode("utf-8")
         payload = json.loads(decoded)
-        return str(payload.get("id") or payload.get("email") or payload.get("sub") or fallback)
+        # Priorizar campos que contienen un UUID válido: "id" (Java auth-service) o "sub" (Supabase)
+        for field in ("id", "sub"):
+            val = payload.get(field)
+            if val and _UUID_RE.match(str(val)):
+                return str(val)
+        # Fallback: email u otro valor
+        return str(payload.get("email") or payload.get("sub") or fallback)
     except Exception:
         return fallback
