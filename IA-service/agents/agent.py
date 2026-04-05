@@ -28,7 +28,7 @@ class Agent:
 
         resolved_user_id = user_id or resolve_user_id(token)
 
-        task_id = create_task(task)
+        task_id = create_task(task, user_id=resolved_user_id)
 
         tool_used = None
         tool_result = None

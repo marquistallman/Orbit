@@ -3,39 +3,56 @@ services:
   postgres:
     image: postgres:16
     container_name: orbit-postgres
+    restart: unless-stopped
     ports:
       - "5432:5432"
     volumes:
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - postgres-data:/var/lib/postgresql/data
     networks:
       - orbit-network
-    # Load environment variables from the .env file
     env_file:
       - ./.env
       - ./.env.local
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   auth-service:
     build:
       context: ./auth-service
       dockerfile: Dockerfile
+    restart: unless-stopped
     ports:
       - "8081:8080"
     environment:
       - DB_HOST=postgres
     networks:
       - orbit-network
-    # Load environment variables from the .env file
     env_file:
       - ./.env
       - ./.env.local
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
   ia-service:
     build:
       context: ./IA-service
       dockerfile: Dockerfile
+    restart: unless-stopped
     ports:
       - "5000:5000"
     volumes:
       - ./db/generated/ia-memory:/data
-    # Load environment variables from the .env file
     env_file:
       - ./.env
       - ./.env.local
@@ -43,6 +60,7 @@ services:
       - PYTHONUNBUFFERED=1
       - MEMORY_DB_PATH=${MEMORY_DB_PATH:-/data/agent_memory.db}
       - USAGE_DB_PATH=${USAGE_DB_PATH:-/data/usage.db}
+      - TELEGRAM_SESSION_DB_PATH=${TELEGRAM_SESSION_DB_PATH:-/data/telegram_sessions.db}
       - RATE_LIMIT_BACKEND=${RATE_LIMIT_BACKEND:-redis}
       - RATE_LIMIT_REDIS_URL=${RATE_LIMIT_REDIS_URL:-redis://redis:6379/0}
       - RATE_LIMIT_REDIS_PREFIX=${RATE_LIMIT_REDIS_PREFIX:-orbit}
@@ -55,11 +73,18 @@ services:
     depends_on:
       - redis
       - gmail-service
-    # Forzamos a FastAPI a escuchar en 0.0.0.0 para que sea accesible desde fuera
     command: uvicorn main:app --host 0.0.0.0 --port 5000
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
   redis:
     image: redis:7-alpine
     container_name: orbit-redis
+    restart: unless-stopped
     ports:
       - "6379:6379"
     command: redis-server --appendonly yes
@@ -67,10 +92,17 @@ services:
       - redis-data:/data
     networks:
       - orbit-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
   gmail-service:
     build:
       context: ./gmail-service
       dockerfile: Dockerfile
+    restart: unless-stopped
     ports:
       - "8082:8082"
     environment:
@@ -83,11 +115,19 @@ services:
     networks:
       - orbit-network
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8082/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
   doc-service:
     build:
       context: ./IA-service/service/doc-service
       dockerfile: Dockerfile
+    restart: unless-stopped
     ports:
       - "9002:9002"
     volumes:
@@ -96,10 +136,12 @@ services:
       - OUTPUT_DIR=/data
     networks:
       - orbit-network
+
   excel-service:
     build:
       context: ./IA-service/service/excel-service
       dockerfile: Dockerfile
+    restart: unless-stopped
     ports:
       - "9004:9004"
     volumes:
@@ -108,10 +150,12 @@ services:
       - OUTPUT_DIR=/data
     networks:
       - orbit-network
+
   code-service:
     build:
       context: ./IA-service/service/code-service
       dockerfile: Dockerfile
+    restart: unless-stopped
     ports:
       - "9003:9003"
     volumes:
@@ -133,10 +177,12 @@ services:
       - CODE_SNIPPETS_DB_PATH=${CODE_SNIPPETS_DB_PATH:-/data/snippets.db}
     networks:
       - orbit-network
+
   mini-maps-service:
     build:
       context: ./IA-service/service/mini-maps-service
       dockerfile: Dockerfile
+    restart: unless-stopped
     ports:
       - "9005:9005"
     volumes:
@@ -149,14 +195,16 @@ services:
       - DEFAULT_USER_ID=anonymous
     networks:
       - orbit-network
+
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_MINI_MAPS_URL: http://localhost:9005
-        VITE_API_URL: http://localhost:8081
-        VITE_IA_URL: http://localhost:5000
+        VITE_MINI_MAPS_URL: ${VITE_MINI_MAPS_URL:-http://localhost:9005}
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8081}
+        VITE_IA_URL: ${VITE_IA_URL:-http://localhost:5000}
+    restart: unless-stopped
     ports:
       - "5173:80"
     depends_on:
@@ -164,17 +212,17 @@ services:
       - ia-service
     networks:
       - orbit-network
-    # Variable de entorno común para que herramientas como Vite/React expongan el puerto
     environment:
       - HOST=0.0.0.0
-      - VITE_MINI_MAPS_URL=http://localhost:9005
 
   prometheus:
     image: prom/prometheus:latest
     container_name: orbit-prometheus
+    restart: unless-stopped
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
       - ./prometheus-alerts.yml:/etc/prometheus/alerts.yml
+      - prometheus-data:/prometheus
     ports:
       - "9090:9090"
     networks:
@@ -183,8 +231,13 @@ services:
   grafana:
     image: grafana/grafana:latest
     container_name: orbit-grafana
+    restart: unless-stopped
     ports:
       - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
     networks:
       - orbit-network
     depends_on:
@@ -196,3 +249,6 @@ networks:
 
 volumes:
   redis-data:
+  postgres-data:
+  prometheus-data:
+  grafana-data:

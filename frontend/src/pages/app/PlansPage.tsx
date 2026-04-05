@@ -156,6 +156,21 @@ export default function PlansPage() {
         gap: 14,
       }}
     >
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        padding: '10px 16px',
+        borderRadius: 8,
+        background: 'rgba(184,90,90,0.1)',
+        border: '1px solid rgba(184,90,90,0.35)',
+        color: '#e0a0a0',
+        fontSize: 12,
+      }}>
+        <span style={{ fontSize: 15 }}>🚧</span>
+        <span>Esta sección está en construcción — los planes y el checkout aún no están completamente implementados.</span>
+      </div>
+
       <DashCard style={{ padding: '16px 20px' }} speed={0.0003}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <div>

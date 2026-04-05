@@ -38,6 +38,8 @@ func main() {
 	mux.HandleFunc("/emails", h.GetEmails)
 	mux.HandleFunc("/emails/sync", h.SyncEmails)
 	mux.HandleFunc("/emails/send", h.SendEmail)
+	mux.HandleFunc("/emails/debug-search", h.DebugSearch)
+	mux.HandleFunc("/emails/delete", h.DeleteEmails)
 
 	// Middleware CORS para permitir peticiones desde el frontend
 	corsHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
