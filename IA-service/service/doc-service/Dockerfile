@@ -1,12 +1,2 @@
-FROM python:3.11-slim
-
-WORKDIR /app
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY . .
-
-EXPOSE 9002
-
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "9002"]
+# Dockerfile deshabilitado: este repositorio ahora prioriza el manager local en Python.
+# Use manager.py para arrancar los servicios en tmux y gestionar dependencias.

@@ -18,7 +18,7 @@ func Load() *Config {
 		DBUser:             getEnv("POSTGRES_USER", "postgres"),
 		DBPass:             getEnv("POSTGRES_PASSWORD", "postgres"),
 		DBName:             "postgres",
-		Port:               "8082",
+		Port:               getEnv("GMAIL_PORT", "8082"), // Port from environment variable, defaults to 8082.
 		GoogleClientID:     getEnv("GOOGLE_CLIENT_ID", ""),
 		GoogleClientSecret: getEnv("GOOGLE_CLIENT_SECRET", ""),
 	}

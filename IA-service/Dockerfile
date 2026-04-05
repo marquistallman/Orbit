@@ -1,23 +1,2 @@
-# Use Python 3.11 slim image
-FROM python:3.11-slim
-
-# Set working directory
-WORKDIR /app
-
-# Create data directory for persistent storage
-RUN mkdir -p /data
-
-# Copy requirements file
-COPY requirements.txt .
-
-# Install dependencies
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy the rest of the application
-COPY . .
-
-# Expose port 8000
-EXPOSE 8000
-
-# Command to run the application
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Dockerfile deshabilitado: este repositorio ahora prioriza el manager local en Python.
+# Use manager.py para arrancar los servicios en tmux y gestionar dependencias.

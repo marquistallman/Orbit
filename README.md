@@ -4,99 +4,156 @@ Orbit is a personal AI assistant platform that centralizes your Gmail, Telegram 
 
 ## Architecture
 
-| Service | Tech | Port | Role |
+| Service | Tech | Port (Dynamic) | Role |
 |---|---|---|---|
-| `frontend` | React + Vite + Nginx | 5173 | Web UI |
-| `auth-service` | Spring Boot | 8081 | Auth, OAuth2, user management |
-| `ia-service` | FastAPI + Telethon | 5000 | AI agent, Telegram MTProto, memory |
-| `gmail-service` | Go | 8082 | Gmail sync, email storage |
-| `doc-service` | Node.js | 9002 | Document generation |
-| `excel-service` | Node.js | 9004 | Spreadsheet generation |
-| `code-service` | Node.js | 9003 | Sandboxed code execution |
-| `mini-maps-service` | Node.js | 9005 | Map rendering |
-| `postgres` | PostgreSQL 16 | 5432 | Primary database |
-| `redis` | Redis 7 | 6379 | Rate limiting backend |
+| `frontend` | React + Vite | Assigned by manager | Web UI |
+| `auth-service` | Spring Boot | Assigned by manager | Auth, OAuth2, user management |
+| `ia-service` | FastAPI + Telethon | Assigned by manager | AI agent, Telegram MTProto, memory |
+| `gmail-service` | Go | Assigned by manager | Gmail sync, email storage |
+| `doc-service` | Python FastAPI | Assigned by manager | Document generation |
+| `excel-service` | Python FastAPI | Assigned by manager | Spreadsheet generation |
+| `code-service` | Python FastAPI | Assigned by manager | Sandboxed code execution |
+| `mini-maps-service` | Python FastAPI | Assigned by manager | Map rendering |
+| `postgres` | PostgreSQL | 5432 | Primary database |
+| `redis` | Redis | 6379 | Rate limiting backend |
 | `prometheus` | Prometheus | 9090 | Metrics collection |
 | `grafana` | Grafana | 3000 | Metrics dashboards |
 
+**Note:** Ports are now assigned dynamically by the manager to avoid conflicts. No more fixed ports.
+
 ## Quick Start (Development)
 
-### 1. Copy and fill environment variables
+### Prerequisites
+- Python 3.11+
+- Java 17+ (for auth-service)
+- Go 1.25+ (for gmail-service)
+- Node.js 22+ (for frontend)
+- tmux (for background services)
+- PostgreSQL and Redis (can be started via manager)
 
+### 1. Bootstrap environment
 ```bash
-cp .env.example .env.local
-# Edit .env.local with your credentials — see "Environment Variables" below
+python3 manager.py --bootstrap
 ```
+This installs system dependencies (Java, Go, Node.js, tmux, etc.), Python packages, and creates `.env` with defaults.
 
-### 2. Start all services
-
+### 2. Configure environment
 ```bash
-docker-compose up --build
+python3 manager.py --config
 ```
+Interactive setup for credentials and settings (no manual editing needed).
 
-Frontend will be available at [http://localhost:5173](http://localhost:5173).
-
-### 3. Run without Docker (individual services)
-
+### 3. Start all services
 ```bash
-# Python manager (starts ia-service and sub-services)
-python manager.py
-
-# Frontend
-cd frontend && npm install && npm run dev
-
-# auth-service
-cd auth-service && ./mvnw spring-boot:run
-
-# gmail-service
-cd gmail-service && go run .
+python manager.py --start
 ```
+Services start in tmux sessions. Frontend available at the assigned port (check console output).
+
+### 5. Access
+- Frontend: `http://localhost:<FRONTEND_PORT>` (assigned dynamically)
+- Check status: `python manager.py --status`
+- Stop services: `python manager.py --stop`
+
+## Production Deployment
+
+### Server Requirements
+- Ubuntu/Debian/CentOS server with sudo access
+- Python 3.11+, Java 17+, Go 1.25+, Node.js 22+
+- tmux, curl, git
+- Firewall configured to allow assigned ports
+
+### Step-by-Step Deployment
+
+1. **Clone repository**
+   ```bash
+   git clone <repo-url>
+   cd orbit
+   ```
+
+2. **Bootstrap project**
+   ```bash
+   python3 manager.py --bootstrap
+   ```
+
+3. **Configure environment**
+   ```bash
+   python3 manager.py --config
+   ```
+
+4. **Start infrastructure (optional, if not using external)**
+   ```bash
+   python3 manager.py --start-infra
+   ```
+
+5. **Start services**
+   ```bash
+   python3 manager.py --start
+   ```
+
+7. **Setup reverse proxy (nginx example)**
+   ```bash
+   sudo apt install nginx
+   # Configure nginx to proxy to assigned ports
+   # Example: proxy_pass http://127.0.0.1:<FRONTEND_PORT>;
+   sudo systemctl enable nginx
+   sudo systemctl start nginx
+   ```
+
+8. **Setup SSL (certbot)**
+   ```bash
+   sudo apt install certbot python3-certbot-nginx
+   sudo certbot --nginx -d yourdomain.com
+   ```
+
+9. **Enable Cloudflare tunnel (optional)**
+   - Set `CLOUDFLARE_TUNNEL_HOSTNAME=yourdomain.com`
+   - Run: `python3 manager.py --cloudflare`
+
+10. **Monitor**
+    - Status: `python3 manager.py --status`
+    - Logs: `tmux attach -t <service-name>`
+    - Metrics: Grafana at port 3000
+
+### Troubleshooting
+- **Port conflicts**: Manager assigns free ports, but check with `netstat -tlnp`
+- **Services fail**: Check logs in tmux: `tmux attach -t <service>`
+- **Dependencies missing**: Run `--bootstrap` again
+- **Permissions**: Ensure user can bind to ports <1024 if needed, or use high ports
+- **Firewall**: `sudo ufw allow <port>` for assigned ports
 
 ## Environment Variables
 
-Copy `.env.example` to `.env.local` and fill in all values. The most critical ones:
+The manager creates `.env` with defaults. Use `python3 manager.py --config` for interactive setup of sensitive values. Do not edit manually.
 
-### Required credentials
+### Auto-configured (do not set)
+- `AUTH_PORT`, `IA_PORT`, etc. (assigned dynamically)
 
-| Variable | Where to get it |
+### Configured via --config
+| Variable | Description |
 |---|---|
-| `POSTGRES_USER` / `POSTGRES_PASSWORD` | Choose a strong password |
-| `JWT_SECRET` | Generate: `openssl rand -hex 64` |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | [Google Cloud Console](https://console.cloud.google.com/) → APIs & Services → Credentials |
-| `OPENROUTER_API_KEY` | [OpenRouter](https://openrouter.ai/) |
-| `TELEGRAM_API_ID` / `TELEGRAM_API_HASH` | [my.telegram.org/apps](https://my.telegram.org/apps) |
-
-### Production-specific variables
-
-```bash
-# Set your public domain for OAuth redirects and CORS
-APP_FRONTEND_URL=https://yourdomain.com
-CORS_ALLOWED_ORIGINS=https://yourdomain.com
-
-# Frontend API URLs (injected at build time)
-VITE_API_URL=https://yourdomain.com/api
-VITE_IA_URL=https://yourdomain.com/ia
-VITE_MINI_MAPS_URL=https://yourdomain.com/maps
-
-# Lock down the database schema once it's stable
-SPRING_JPA_DDL_AUTO=validate
-
-# Grafana admin password
-GRAFANA_ADMIN_PASSWORD=strong-random-password
-```
+| `POSTGRES_USER` / `POSTGRES_PASSWORD` | DB credentials |
+| `JWT_SECRET` | Random secret |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth |
+| `OPENROUTER_API_KEY` | LLM API key |
+| `TELEGRAM_API_ID` / `TELEGRAM_API_HASH` | Telegram API |
+| `APP_FRONTEND_URL` | Public frontend URL |
+| `CLOUDFLARE_TUNNEL_HOSTNAME` | Cloudflare domain |
+| `GRAFANA_ADMIN_PASSWORD` | Grafana password |
 
 ## Features
 
-- **Messages** — Unified inbox for Gmail and Telegram personal messages, with AI summarization and smart reply
-- **Finance** — Automatic detection and parsing of banking emails (PSE, ACH Colombia, Bancolombia, Nequi, etc.)
-- **Agent** — LLM-powered assistant (OpenRouter) with tools: web search, code execution, document generation, maps
-- **Apps** — Connect and manage integrations (Gmail OAuth, Telegram MTProto) from a single panel
-- **Dashboard** — Live overview of connected apps, recent tasks, AI-generated daily summary
-- **Observability** — Prometheus metrics + Grafana dashboards + adaptive rate limiting
+- **Messages** — Unified inbox for Gmail and Telegram
+- **Finance** — Banking email parsing
+- **Agent** — LLM assistant with tools
+- **Apps** — Integration management
+- **Dashboard** — Live overview
+- **Observability** — Prometheus + Grafana
 
-## Production Deployment Checklist
-
-Before going live, complete all of these:
+## Security Notes
+- Never commit `.env` or `.env.local`
+- Use strong passwords
+- Configure firewall properly
+- Keep dependencies updated
 
 ### Security (critical)
 - [ ] Rotate all credentials if they were ever committed to git
