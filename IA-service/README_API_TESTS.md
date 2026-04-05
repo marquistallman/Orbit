@@ -2,7 +2,7 @@
 
 Guia rapida para probar memoria, planes y consumo desde Swagger:
 
-- Swagger: `http://localhost:5000/docs`
+- Swagger: `http://localhost:12002/docs`
 - Header usuario recomendado en todas las pruebas:
   - `X-User-Id: carlos-test`
 - Header admin solo para cambiar plan:

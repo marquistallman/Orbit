@@ -25,7 +25,7 @@ public class ProfileService {
     private final AppActivityLogRepository    activityLogRepository;
     private final PasswordEncoder             passwordEncoder;
 
-    @Value("${gmail.service.url:http://localhost:8082}")
+    @Value("${gmail.service.url:http://localhost:12003}")
     private String gmailServiceUrl;
 
     @Transactional(readOnly = true)

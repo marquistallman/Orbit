@@ -6,7 +6,7 @@ import { getConnectedApps } from '../../api/apps'
 import { deleteAccount } from '../../api/profile'
 import DashCard from '../../components/ui/DashCard'
 
-const IA_URL = import.meta.env.VITE_IA_URL || 'http://localhost:5000'
+const IA_URL = import.meta.env.VITE_IA_URL || 'http://localhost:12002'
 
 function authHeaders(): Record<string, string> {
   const token = localStorage.getItem('token')
@@ -141,7 +141,7 @@ export default function ProfilePage() {
   useEffect(() => {
     const token = localStorage.getItem('token')
     if (!token) return
-    fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/profile/me`, {
+    fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:12001'}/api/profile/me`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then(r => r.ok ? r.json() : null)

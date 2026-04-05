@@ -460,7 +460,7 @@ def create_rate_limiter() -> RequestRateLimiter | RedisRequestRateLimiter:
         print("WARNING: RATE_LIMIT_BACKEND=redis but redis package is not installed; using memory limiter")
         return RequestRateLimiter()
 
-    redis_url = os.getenv("RATE_LIMIT_REDIS_URL", "redis://localhost:6379/0")
+    redis_url = os.getenv("RATE_LIMIT_REDIS_URL", "redis://localhost:12008/0")
     prefix = os.getenv("RATE_LIMIT_REDIS_PREFIX", "orbit")
     socket_timeout = float(os.getenv("RATE_LIMIT_REDIS_SOCKET_TIMEOUT_SECONDS", "1.0"))
     violation_ttl_seconds = int(os.getenv("RATE_LIMIT_COOLDOWN_VIOLATION_TTL_SECONDS", "3600"))

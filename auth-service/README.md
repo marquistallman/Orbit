@@ -27,9 +27,9 @@ To run the service, you can use the following Maven command:
 mvn spring-boot:run
 ```
 
-The service will be available at `http://localhost:8080` when started with `mvn spring-boot:run`.
+The service will be available at `http://localhost:12001` when started with `mvn spring-boot:run`.
 
-If started via the root `docker-compose.yml`, it is exposed on `http://localhost:8081` (host `8081` -> container `8080`).
+If started via the root `docker-compose.yml`, it is exposed on `http://localhost:12001` (host `12001` -> container `8080`).
 
 ## API Documentation
 

@@ -5,7 +5,7 @@ services:
     container_name: orbit-postgres
     restart: unless-stopped
     ports:
-      - "5432:5432"
+      - "12011:5432"
     volumes:
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
       - postgres-data:/var/lib/postgresql/data
@@ -26,7 +26,7 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "8081:8080"
+      - "12001:8080"
     environment:
       - DB_HOST=postgres
     networks:
@@ -38,7 +38,7 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:8080/actuator/health || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -50,7 +50,7 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "5000:5000"
+      - "12002:5000"
     volumes:
       - ./db/generated/ia-memory:/data
     env_file:
@@ -75,7 +75,7 @@ services:
       - gmail-service
     command: uvicorn main:app --host 0.0.0.0 --port 5000
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:5000/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:5000/health || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -86,7 +86,7 @@ services:
     container_name: orbit-redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "12008:6379"
     command: redis-server --appendonly yes
     volumes:
       - redis-data:/data
@@ -104,7 +104,7 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "8082:8082"
+      - "12003:8082"
     environment:
       - DB_HOST=postgres
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
@@ -118,7 +118,7 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8082/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:8082/health || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -129,7 +129,7 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "9002:9002"
+      - "12004:9002"
     volumes:
       - ./db/generated/docs:/data
     environment:
@@ -143,7 +143,7 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "9004:9004"
+      - "12005:9004"
     volumes:
       - ./db/generated/excel:/data
     environment:
@@ -157,7 +157,7 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "9003:9003"
+      - "12006:9003"
     volumes:
       - ./db/generated/code:/data
     environment:
@@ -184,7 +184,7 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "9005:9005"
+      - "12007:9005"
     volumes:
       - ./db/generated/mini-maps:/data
     environment:
@@ -201,12 +201,12 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_MINI_MAPS_URL: ${VITE_MINI_MAPS_URL:-http://localhost:9005}
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:8081}
-        VITE_IA_URL: ${VITE_IA_URL:-http://localhost:5000}
+        VITE_MINI_MAPS_URL: ${VITE_MINI_MAPS_URL:-http://localhost:12007}
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:12001}
+        VITE_IA_URL: ${VITE_IA_URL:-http://localhost:12002}
     restart: unless-stopped
     ports:
-      - "5173:80"
+      - "12000:80"
     depends_on:
       - auth-service
       - ia-service
@@ -224,7 +224,7 @@ services:
       - ./prometheus-alerts.yml:/etc/prometheus/alerts.yml
       - prometheus-data:/prometheus
     ports:
-      - "9090:9090"
+      - "12009:9090"
     networks:
       - orbit-network
 
@@ -233,7 +233,7 @@ services:
     container_name: orbit-grafana
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "12010:3000"
     volumes:
       - grafana-data:/var/lib/grafana
     environment:

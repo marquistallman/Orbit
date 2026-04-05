@@ -34,7 +34,7 @@ cp .env.example .env.local
 docker-compose up --build
 ```
 
-Frontend will be available at [http://localhost:5173](http://localhost:5173).
+Frontend will be available at [http://localhost:12000](http://localhost:12000).
 
 ### 3. Run without Docker (individual services)
 
@@ -123,7 +123,7 @@ Before going live, complete all of these:
 1. Go to [Google Cloud Console](https://console.cloud.google.com/) → APIs & Services → Credentials
 2. Create an OAuth 2.0 Client ID (Web application)
 3. Add authorized redirect URIs:
-   - Development: `http://localhost:8081/login/oauth2/code/google`
+   - Development: `http://localhost:12001/login/oauth2/code/google`
    - Production: `https://yourdomain.com/api/login/oauth2/code/google`
 4. Enable: Gmail API, Google People API
 5. Copy Client ID and Secret to `.env.local`
@@ -141,8 +141,8 @@ Sessions are stored persistently in `TELEGRAM_SESSION_DB_PATH` (default: `/data/
 
 ## Monitoring
 
-- **Prometheus**: [http://localhost:9090](http://localhost:9090)
-- **Grafana**: [http://localhost:3000](http://localhost:3000) (default login: `admin` / value of `GRAFANA_ADMIN_PASSWORD`)
+- **Prometheus**: [http://localhost:12009](http://localhost:12009)
+- **Grafana**: [http://localhost:12010](http://localhost:12010) (default login: `admin` / value of `GRAFANA_ADMIN_PASSWORD`)
 
 Rate limiting metrics are exposed by `ia-service` at `/metrics` and scraped by Prometheus.
 

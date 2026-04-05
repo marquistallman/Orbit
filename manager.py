@@ -1,14 +1,62 @@
 import subprocess
-import tkinter as tk
-from tkinter import messagebox
-import webbrowser
 import os
 import secrets
+import sys
+
+def get_key():
+    """Lee una sola tecla del terminal sin esperar a Enter (compatible Windows/Linux)."""
+    if os.name == 'nt':
+        import msvcrt
+        ch = msvcrt.getch()
+        if ch in (b'\x00', b'\xe0'): # Prefijo de flechas en Windows
+            return msvcrt.getch()
+        return ch
+    else:
+        import termios
+        import tty
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        try:
+            tty.setraw(sys.stdin.fileno())
+            ch = sys.stdin.read(1)
+            if ch == '\x1b': # Secuencia de escape (flechas en Linux)
+                ch = sys.stdin.read(2)
+            return ch
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+
+def pick(title, options):
+    """Muestra un menú seleccionable con cursor."""
+    idx = 0
+    while True:
+        clear_screen()
+        print_header(title)
+        for i, opt in enumerate(options):
+            if i == idx:
+                print(f" \033[1;36m>\033[0m {opt}") # Cursor Cian brillante
+            else:
+                print(f"   {opt}")
+        
+        print(f"\n[W/S] Arriba/Abajo | [Enter] Seleccionar")
+        
+        k = get_key()
+        # Teclas: Up(Windows: b'H', Linux: '[A'), Down(Win: b'P', Linux: '[B'), Enter(b'\r', '\r', '\n')
+        if k in (b'H', '[A', 'w', 'W'): idx = (idx - 1) % len(options)
+        elif k in (b'P', '[B', 's', 'S'): idx = (idx + 1) % len(options)
+        elif k in (b'\r', '\r', '\n', b'\n'): return idx
+
+def clear_screen():
+    os.system('cls' if os.name == 'nt' else 'clear')
+
+def print_header(title):
+    print(f"\n{'='*50}")
+    print(f" {title}")
+    print(f"{'='*50}")
 
 def check_or_create_env_file():
     """Checks for a .env file and creates it with secure defaults if not found."""
     if not os.path.exists('.env'):
-        messagebox.showinfo("Setup", "'.env' file not found. Creating a new one with secure defaults.")
+        print("[!] '.env' file not found. Creating a new one with secure defaults.")
         
         # Default DB credentials (as defined in docker-compose)
         db_user = "postgres"
@@ -25,9 +73,9 @@ def check_or_create_env_file():
             f.write(f"\n# IA Service\n")
             f.write(f"OPENROUTER_API_KEY=your_openrouter_key_here\n")
             f.write(f"OPENROUTER_MODEL=openai/gpt-4o-mini\n")
-            f.write(f"OPENROUTER_SITE_URL=http://localhost:5173\n")
+            f.write(f"OPENROUTER_SITE_URL=http://localhost:12000\n")
             f.write(f"OPENROUTER_APP_NAME=Orbit\n")
-            f.write(f"CORS_ALLOWED_ORIGINS=http://localhost:5173\n")
+            f.write(f"CORS_ALLOWED_ORIGINS=http://localhost:12000\n")
             f.write(f"CORS_ALLOW_CREDENTIALS=true\n")
             f.write(f"HTTP_TIMEOUT_SECONDS=20\n")
             f.write(f"MEMORY_DB_PATH=/data/agent_memory.db\n")
@@ -92,7 +140,7 @@ def check_or_create_env_file():
             f.write(f"LINKEDIN_CLIENT_ID=placeholder\n")
             f.write(f"LINKEDIN_CLIENT_SECRET=placeholder\n")
         
-        messagebox.showinfo("Success", "A new '.env' file has been created. Please DO NOT commit this file to version control.")
+        print("[+] A new '.env' file has been created. Please DO NOT commit this file to version control.")
     else:
         # Fix existing .env file if it has empty OAuth credentials
         fix_empty_oauth_credentials()
@@ -105,13 +153,13 @@ def check_or_create_frontend_env():
     if os.path.exists(frontend_dir):
         if not os.path.exists(env_path):
             with open(env_path, "w") as f:
-                f.write("VITE_API_URL=http://localhost:8081\n")
-                f.write("VITE_IA_URL=http://localhost:5000\n")
-                f.write("VITE_GMAIL_URL=http://localhost:8082\n")
-                f.write("VITE_DOC_URL=http://localhost:9002\n")
-                f.write("VITE_EXCEL_URL=http://localhost:9004\n")
-                f.write("VITE_CODE_URL=http://localhost:9003\n")
-                f.write("VITE_MINI_MAPS_URL=http://localhost:9005\n")
+                f.write("VITE_API_URL=http://localhost:12001\n")
+                f.write("VITE_IA_URL=http://localhost:12002\n")
+                f.write("VITE_GMAIL_URL=http://localhost:12003\n")
+                f.write("VITE_DOC_URL=http://localhost:12004\n")
+                f.write("VITE_EXCEL_URL=http://localhost:12005\n")
+                f.write("VITE_CODE_URL=http://localhost:12006\n")
+                f.write("VITE_MINI_MAPS_URL=http://localhost:12007\n")
                 f.write("VITE_DELIVERY_URL=\n")
                 f.write("VITE_RESERVATIONS_URL=\n")
                 f.write("VITE_TRANSPORT_URL=\n")
@@ -135,7 +183,7 @@ def check_or_create_ia_env():
         if not os.path.exists(env_path):
             with open(env_path, "w") as f:
                 f.write("OPENROUTER_API_KEY=your_api_key_here\n")
-                f.write("TOKEN_VAULT_URL=http://localhost:8080\n")
+                f.write("TOKEN_VAULT_URL=http://localhost:12001\n")
             print(f"Created {env_path} with default values.")
         
         # Ensure ignored in root .gitignore
@@ -185,26 +233,26 @@ def fix_empty_oauth_credentials():
         if modified:
             with open('.env', 'w') as f:
                 f.writelines(new_lines)
-            print("Fixed empty OAuth credentials in .env file.")
+            print("[*] Fixed empty OAuth credentials in .env file.")
             
     except Exception as e:
-        print(f"Warning: Could not check/fix .env file: {e}")
+        print(f"[!] Warning: Could not check/fix .env file: {e}")
  
 def run_command(command):
-    """Runs a command and shows the status in a message box."""
+    """Runs a command and shows the status in the terminal."""
+    print(f"\n[*] Executing: {command}")
     try:
-        # Using shell=True for simplicity with docker-compose commands
-        # In a real-world app, you might want to split the command into a list
         process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         stdout, stderr = process.communicate()
         if process.returncode == 0:
-            messagebox.showinfo("Success", f"Command executed successfully:\n{command}")
+            print(f"[+] Success:\n{stdout}")
         else:
-            messagebox.showerror("Error", f"An error occurred:\n{stderr}")
+            print(f"[-] Error:\n{stderr}")
     except FileNotFoundError:
-        messagebox.showerror("Error", "Command not found. Please ensure Docker is installed and in your PATH.")
+        print("[-] Error: Command not found. Please ensure Docker is installed.")
     except Exception as e:
-        messagebox.showerror("Error", f"An unexpected error occurred:\n{e}")
+        print(f"[-] An unexpected error occurred: {e}")
+    input("\nPress Enter to continue...")
 
 def start_service(service_name):
     """Starts a specific service using docker-compose."""
@@ -231,256 +279,110 @@ def build_service(service_name):
     command = f"docker-compose build {service_name}"
     run_command(command)
 
-def open_build_selector():
-    """Opens a window to select which service to build."""
-    selector = tk.Toplevel()
-    selector.title("Build Service")
-    selector.geometry("300x220")
+SERVICES = [
+    ("Auth Service", "auth-service"),
+    ("IA Service", "ia-service"),
+    ("Gmail Service", "gmail-service"),
+    ("Doc Service", "doc-service"),
+    ("Excel Service", "excel-service"),
+    ("Code Service", "code-service"),
+    ("Mini Maps", "mini-maps-service"),
+    ("Frontend", "frontend")
+]
 
-    tk.Label(selector, text="Select service to build:", font=("Helvetica", 10, "bold")).pack(pady=10)
+def menu_build_service():
+    options = [label for label, _ in SERVICES] + ["Back"]
+    choice = pick("Build Service", options)
+    if choice < len(SERVICES):
+        build_service(SERVICES[choice][1])
 
-    services = [
-        ("Auth Service", "auth-service"),
-        ("IA Service", "ia-service"),
-        ("Gmail Service", "gmail-service"),
-        ("Doc Service", "doc-service"),
-        ("Excel Service", "excel-service"),
-        ("Code Service", "code-service"),
-        ("Mini Maps", "mini-maps-service"),
-        ("Frontend", "frontend")
-    ]
+def menu_service_control(action="start"):
+    options = [label for label, _ in SERVICES] + ["Back"]
+    choice = pick(f"{action.capitalize()} Service", options)
+    if choice < len(SERVICES):
+        if action == "start": start_service(SERVICES[choice][1])
+        else: stop_service(SERVICES[choice][1])
 
-    for label, service in services:
-        tk.Button(selector, text=label, command=lambda s=service: [build_service(s), selector.destroy()], width=20).pack(pady=2)
+def update_env_variable(file_path, key):
+    clear_screen()
+    print_header(f"Updating: {key}")
+    new_val = input(f"Enter new value for {key} (Leave empty to cancel): ").strip()
+    if not new_val: return
 
-def open_url(url):
-    """Opens the given URL in the default web browser."""
-    webbrowser.open(url)
-
-def open_secrets_manager():
-    """Opens a window to update secrets in .env without revealing existing values."""
-    editor = tk.Toplevel()
-    editor.title("Manage Environment Secrets")
-    editor.geometry("600x650")
-
-    tk.Label(editor, text="Update Secrets (Leave empty to keep current value)", font=("Helvetica", 10, "bold")).pack(pady=10)
-    
-    # Define sections: (Title, Fields [(Label, Key, ShowChar)], FilePath)
-    sections = [
-        ("Backend / Root .env", [
-            ("Google Client ID", "GOOGLE_CLIENT_ID", "*"),
-            ("Google Secret", "GOOGLE_CLIENT_SECRET", "*"),
-            ("GitHub Client ID", "GITHUB_CLIENT_ID", "*"),
-            ("GitHub Secret", "GITHUB_CLIENT_SECRET", "*"),
-            ("Facebook Client ID", "FACEBOOK_CLIENT_ID", "*"),
-            ("Facebook Secret", "FACEBOOK_CLIENT_SECRET", "*"),
-            ("LinkedIn Client ID", "LINKEDIN_CLIENT_ID", "*"),
-            ("LinkedIn Secret", "LINKEDIN_CLIENT_SECRET", "*"),
-            ("OpenRouter API Key", "OPENROUTER_API_KEY", "*"),
-            ("OpenRouter Model", "OPENROUTER_MODEL", ""),
-            ("OpenRouter Site URL", "OPENROUTER_SITE_URL", ""),
-            ("OpenRouter App Name", "OPENROUTER_APP_NAME", ""),
-            ("CORS Allowed Origins", "CORS_ALLOWED_ORIGINS", ""),
-            ("CORS Allow Credentials", "CORS_ALLOW_CREDENTIALS", ""),
-            ("HTTP Timeout Seconds", "HTTP_TIMEOUT_SECONDS", ""),
-            ("Memory DB Path", "MEMORY_DB_PATH", ""),
-            ("Gmail Service URL", "GMAIL_SERVICE_URL", ""),
-            ("Token Vault URL", "TOKEN_VAULT_URL", ""),
-            ("Doc Service URL", "DOC_SERVICE_URL", ""),
-            ("Code Service URL", "CODE_SERVICE_URL", ""),
-            ("Code Exec Timeout Seconds", "CODE_EXEC_TIMEOUT_SECONDS", ""),
-            ("Code Max Chars", "CODE_MAX_CHARS", ""),
-            ("Code Max Output Chars", "CODE_MAX_OUTPUT_CHARS", ""),
-            ("Code Service Max Memory (MB)", "CODE_MAX_MEMORY_MB", ""),
-            ("Code Service Max STDIN Chars", "CODE_MAX_STDIN_CHARS", ""),
-            ("Code Service Max SQL Rows", "CODE_MAX_SQL_RESULT_ROWS", ""),
-            ("Code Service Max SQL Statements", "CODE_MAX_SQL_STATEMENTS", ""),
-            ("Code Strict Mode", "CODE_STRICT_MODE", ""),
-            ("Code Python Allowed Imports", "CODE_PYTHON_ALLOWED_IMPORTS", ""),
-            ("Code JS Allowed Modules", "CODE_JS_ALLOWED_MODULES", ""),
-            ("Code Python Block Patterns", "CODE_PYTHON_BLOCK_PATTERNS", ""),
-            ("Code JS Block Patterns", "CODE_JS_BLOCK_PATTERNS", ""),
-            ("Code SQL Block Patterns", "CODE_SQL_BLOCK_PATTERNS", ""),
-            ("Code Snippets DB Path", "CODE_SNIPPETS_DB_PATH", ""),
-            ("Excel Service URL", "EXCEL_SERVICE_URL", ""),
-            ("Mini Maps Service URL", "MINI_MAPS_SERVICE_URL", ""),
-            ("Delivery Enabled", "CONNECTOR_DELIVERY_ENABLED", ""),
-            ("Delivery API URL", "DELIVERY_API_URL", ""),
-            ("Delivery API Key", "DELIVERY_API_KEY", "*"),
-            ("WhatsApp Enabled", "CONNECTOR_WHATSAPP_ENABLED", ""),
-            ("WhatsApp Provider", "WHATSAPP_PROVIDER", ""),
-            ("WhatsApp API URL", "WHATSAPP_API_URL", ""),
-            ("WhatsApp Access Token", "WHATSAPP_ACCESS_TOKEN", "*"),
-            ("WhatsApp Phone Number ID", "WHATSAPP_PHONE_NUMBER_ID", ""),
-            ("Telegram Enabled", "CONNECTOR_TELEGRAM_ENABLED", ""),
-            ("Telegram Bot Token", "TELEGRAM_BOT_TOKEN", "*"),
-            ("Telegram API URL", "TELEGRAM_API_URL", ""),
-            ("Reservations Enabled", "CONNECTOR_RESERVATIONS_ENABLED", ""),
-            ("Reservations API URL", "RESERVATIONS_API_URL", ""),
-            ("Reservations API Key", "RESERVATIONS_API_KEY", "*"),
-            ("Transport Enabled", "CONNECTOR_TRANSPORT_ENABLED", ""),
-            ("Transport API URL", "PUBLIC_TRANSPORT_API_URL", ""),
-            ("Transport API Key", "PUBLIC_TRANSPORT_API_KEY", "*"),
-            ("Broker Enabled", "CONNECTOR_BROKER_ENABLED", ""),
-            ("Broker API URL", "BROKER_API_URL", ""),
-            ("Broker API Key", "BROKER_API_KEY", "*"),
-            ("Broker API Secret", "BROKER_API_SECRET", "*"),
-            ("Bank Enabled", "CONNECTOR_BANK_ENABLED", ""),
-            ("Bank API URL", "BANK_API_URL", ""),
-            ("Bank API Key", "BANK_API_KEY", "*"),
-            ("Bank API Secret", "BANK_API_SECRET", "*"),
-            ("JWT Secret", "JWT_SECRET", "*")
-        ], ".env"),
-        ("Frontend / frontend/.env", [
-            ("VITE API URL (Auth)", "VITE_API_URL", ""),
-            ("VITE IA URL (Agent)", "VITE_IA_URL", ""),
-            ("VITE Gmail URL", "VITE_GMAIL_URL", ""),
-            ("VITE Doc Service URL", "VITE_DOC_URL", ""),
-            ("VITE Excel Service URL", "VITE_EXCEL_URL", ""),
-            ("VITE Code Service URL", "VITE_CODE_URL", ""),
-            ("VITE Mini Maps Service URL", "VITE_MINI_MAPS_URL", ""),
-            ("VITE Delivery URL", "VITE_DELIVERY_URL", ""),
-            ("VITE Reservations URL", "VITE_RESERVATIONS_URL", ""),
-            ("VITE Transport URL", "VITE_TRANSPORT_URL", ""),
-            ("VITE Broker URL", "VITE_BROKER_URL", ""),
-            ("VITE Bank URL", "VITE_BANK_URL", ""),
-            ("VITE Telegram URL", "VITE_TELEGRAM_URL", ""),
-            ("VITE WhatsApp URL", "VITE_WHATSAPP_URL", "")
-        ], os.path.join("frontend", ".env")),
-        ("IA Service / IA-service/.env", [
-            ("OpenRouter API Key", "OPENROUTER_API_KEY", "*"),
-            ("Token Vault URL", "TOKEN_VAULT_URL", "")
-        ], os.path.join("IA-service", ".env"))
-    ]
-    
-    entries_map = {} # Maps key -> (EntryWidget, FilePath)
-    form_frame = tk.Frame(editor)
-    form_frame.pack(padx=10, pady=5, fill="both", expand=True)
-    
-    current_row = 0
-    for section_title, fields, file_path in sections:
-        tk.Label(form_frame, text=section_title, font=("Helvetica", 9, "bold", "underline"), fg="#C6A15B").grid(row=current_row, column=0, columnspan=2, pady=(15, 5), sticky="w")
-        current_row += 1
-        
-        for label, key, show_char in fields:
-            tk.Label(form_frame, text=label).grid(row=current_row, column=0, sticky="e", padx=5, pady=2)
-            entry = tk.Entry(form_frame, width=45, show=show_char) 
-            entry.grid(row=current_row, column=1, padx=5, pady=2)
-            entries_map[key] = (entry, file_path)
-            current_row += 1
-
-    def update_file(filename, updates):
-        if not os.path.exists(filename): return
-        
-        with open(filename, 'r') as f:
+    lines = []
+    if os.path.exists(file_path):
+        with open(file_path, 'r') as f:
             lines = f.readlines()
+
+    found = False
+    new_lines = []
+    for line in lines:
+        if line.startswith(f"{key}="):
+            new_lines.append(f"{key}={new_val}\n")
+            found = True
+        else: new_lines.append(line)
+
+    if not found:
+        new_lines.append(f"{key}={new_val}\n")
+
+    with open(file_path, 'w') as f:
+        f.writelines(new_lines)
+    print(f"\n[+] {key} updated in {file_path}")
+    input("\nPress Enter to continue...")
+
+def menu_configure_secrets():
+    while True:
+        options = [
+            "Update Root .env (OpenRouter, JWT, etc.)",
+            "Update Frontend .env",
+            "Update IA-service .env",
+            "Back"
+        ]
+        choice = pick("Configure Secrets", options)
+        if choice == 3: break
         
-        new_lines = []
-        for line in lines:
-            parts = line.split('=', 1)
-            if parts:
-                key = parts[0].strip()
-                if key in updates:
-                    new_lines.append(f"{key}={updates[key]}\n")
-                    del updates[key] # Mark as processed
-                    continue
-            new_lines.append(line)
+        path = ".env" if choice == 0 else (os.path.join("frontend", ".env") if choice == 1 else os.path.join("IA-service", ".env"))
+        clear_screen()
+        print_header(f"Editing {path}")
+        key = input("Enter the variable name to update (e.g. OPENROUTER_API_KEY): ").strip()
+        if key: update_env_variable(path, key)
 
-        # Append new keys that were not present in file.
-        if updates:
-            if new_lines and not new_lines[-1].endswith("\n"):
-                new_lines.append("\n")
-            for key, value in updates.items():
-                new_lines.append(f"{key}={value}\n")
-            
-        with open(filename, 'w') as f:
-            f.writelines(new_lines)
-
-    def save_changes():
-        # Group updates by file
-        updates_by_file = {}
-        for key, (entry, file_path) in entries_map.items():
-            val = entry.get().strip()
-            if val:
-                if file_path not in updates_by_file: updates_by_file[file_path] = {}
-                updates_by_file[file_path][key] = val
-        
-        for fpath, updates in updates_by_file.items():
-            update_file(fpath, updates)
-            
-        messagebox.showinfo("Success", "Secrets updated successfully.")
-        editor.destroy()
-        
-    tk.Button(editor, text="Save Updates", command=save_changes, bg="#4CAF50", fg="white").pack(pady=20)
-
-def create_gui():
-    """Creates the main GUI window."""
-    root = tk.Tk()
-    root.title("Orbit Service Manager")
-
-    # Ensure .env file exists before doing anything else
+def main_loop():
     check_or_create_env_file()
     check_or_create_frontend_env()
     check_or_create_ia_env()
-
-    frame = tk.Frame(root, padx=10, pady=10)
-    frame.pack(padx=10, pady=10)
-
-    title_label = tk.Label(frame, text="Orbit Service Manager", font=("Helvetica", 16))
-    title_label.pack(pady=(0, 10))
-
-    # --- Start buttons ---
-    start_all_button = tk.Button(frame, text="Start All Services", command=start_all_services, width=25)
-    start_all_button.pack(pady=5)
-
-    build_button = tk.Button(frame, text="Build Single Service", command=open_build_selector, width=25)
-    build_button.pack(pady=5)
-
-    # --- Configuration ---
-    config_button = tk.Button(frame, text="Configure Secrets (.env)", command=open_secrets_manager, width=25)
-    config_button.pack(pady=5)
     
-    # --- Individual Service Controls ---
-    services = [
-        ("Auth Service", "auth-service"),
-        ("IA Service", "ia-service"),
-        ("Gmail Service", "gmail-service"),
-        ("Doc Service", "doc-service"),
-        ("Excel Service", "excel-service"),
-        ("Code Service", "code-service"),
-        ("Mini Maps", "mini-maps-service"),
-        ("Frontend", "frontend")
+    options = [
+        "Start All Services",
+        "Stop All Services",
+        "Build Single Service",
+        "Start Single Service",
+        "Stop Single Service",
+        "Configure Secrets (.env)",
+        "Show Service URLs",
+        "Exit"
     ]
-    
-    for label, service in services:
-        row_frame = tk.Frame(frame)
-        row_frame.pack(pady=2)
-        tk.Label(row_frame, text=label, width=12, anchor="e").pack(side=tk.LEFT, padx=5)
-        tk.Button(row_frame, text="Start", command=lambda s=service: start_service(s), width=8, bg="#E8F5E9").pack(side=tk.LEFT, padx=2)
-        tk.Button(row_frame, text="Stop", command=lambda s=service: stop_service(s), width=8, bg="#FFEBEE").pack(side=tk.LEFT, padx=2)
-    
-    # --- Access buttons ---
-    tk.Label(frame, text="Access Services", font=("Helvetica", 11, "bold")).pack(pady=(15, 5))
 
-    # Puertos estandar: Vite (5173), SpringBoot (8080), FastAPI (8000)
-    btn_open_front = tk.Button(frame, text="Open Frontend (Localhost)", command=lambda: open_url("http://localhost:5173"), width=25)
-    btn_open_front.pack(pady=2)
-
-    btn_open_auth = tk.Button(frame, text="Open Auth API", command=lambda: open_url("http://localhost:8081"), width=25)
-    btn_open_auth.pack(pady=2)
-
-    btn_open_ia = tk.Button(frame, text="Open IA Docs", command=lambda: open_url("http://localhost:5000/docs"), width=25)
-    btn_open_ia.pack(pady=2)
-
-    btn_open_gmail = tk.Button(frame, text="Open Gmail API", command=lambda: open_url("http://localhost:8082"), width=25)
-    btn_open_gmail.pack(pady=2)
-
-    # --- Stop button ---
-    stop_button = tk.Button(frame, text="Stop All Services", command=stop_all_services, bg="red", fg="white", width=25)
-    stop_button.pack(pady=(10, 5))
-
-
-    root.mainloop()
+    while True:
+        choice = pick("Orbit Service Manager (Interactive TUI)", options)
+        
+        if choice == 0: start_all_services()
+        elif choice == 1: stop_all_services()
+        elif choice == 2: menu_build_service()
+        elif choice == 3: menu_service_control("start")
+        elif choice == 4: menu_service_control("stop")
+        elif choice == 5: menu_configure_secrets()
+        elif choice == 6:
+            clear_screen()
+            print_header("Service URLs")
+            print("- Frontend: http://localhost:12000")
+            print("- Auth API: http://localhost:12001")
+            print("- IA Docs:   http://localhost:12002/docs")
+            print("- Gmail API: http://localhost:12003")
+            input("\nPress Enter to continue...")
+        elif choice == 7:
+            print("Goodbye!")
+            break
 
 if __name__ == "__main__":
-    create_gui()
+    main_loop()

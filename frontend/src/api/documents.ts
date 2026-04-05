@@ -1,6 +1,6 @@
-const IA_URL = import.meta.env.VITE_IA_URL || 'http://localhost:5000'
-export const DOC_SERVICE_URL = import.meta.env.VITE_DOC_URL || 'http://localhost:9002'
-export const EXCEL_SERVICE_URL = import.meta.env.VITE_EXCEL_URL || 'http://localhost:9004'
+const IA_URL = import.meta.env.VITE_IA_URL || 'http://localhost:12002'
+export const DOC_SERVICE_URL = import.meta.env.VITE_DOC_URL || 'http://localhost:12004'
+export const EXCEL_SERVICE_URL = import.meta.env.VITE_EXCEL_URL || 'http://localhost:12005'
 
 interface AgentActionResponse<T = unknown> {
   tool: string

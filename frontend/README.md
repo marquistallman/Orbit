@@ -19,7 +19,7 @@ Web interface for the **Orbit AI Operator** system, built with React + Vite + Ty
 - Node.js >= 18
 - npm >= 9
 - Docker Desktop (for PostgreSQL)
-- Auth-service running on `http://localhost:8081` (when started with docker-compose)
+- Auth-service running on `http://localhost:12001` (when started with docker-compose)
 
 ---
 
@@ -53,7 +53,7 @@ cd frontend
 npm run dev
 ```
 
-Open `http://localhost:5173`
+Open `http://localhost:12000`
 
 > ⚠️ **Important:** Always start PostgreSQL before the auth-service. Without it, the backend won't start.
 
@@ -81,10 +81,10 @@ Google, LinkedIn, GitHub and Facebook buttons redirect to the backend to start t
 
 | Button | Endpoint |
 |--------|----------|
-| Google | `http://localhost:8081/oauth2/authorization/google` |
-| LinkedIn | `http://localhost:8081/oauth2/authorization/linkedin` |
-| GitHub | `http://localhost:8081/oauth2/authorization/github` |
-| Facebook | `http://localhost:8081/oauth2/authorization/facebook` |
+| Google | `http://localhost:12001/oauth2/authorization/google` |
+| LinkedIn | `http://localhost:12001/oauth2/authorization/linkedin` |
+| GitHub | `http://localhost:12001/oauth2/authorization/github` |
+| Facebook | `http://localhost:12001/oauth2/authorization/facebook` |
 
 For these to work, the auth-service team must add real credentials to the root `.env`:
 
@@ -122,8 +122,8 @@ The Messages page already uses real integration with fallback:
 
 1. It tries IA-service first (`POST /agent/action` with `gmail_read`)
 2. If IA fails or returns empty, it falls back to Gmail-service (`/emails` and optional `/emails/sync`)
-3. Make sure IA-service runs on `http://localhost:5000`
-4. Make sure Gmail-service runs on `http://localhost:8082`
+3. Make sure IA-service runs on `http://localhost:12002`
+4. Make sure Gmail-service runs on `http://localhost:12003`
 
 Required `.env` for IA-service:
 
@@ -131,7 +131,7 @@ Required `.env` for IA-service:
 # If IA-service runs inside docker-compose:
 TOKEN_VAULT_URL=http://auth-service:8080
 # If IA-service runs locally from your host:
-# TOKEN_VAULT_URL=http://localhost:8081
+# TOKEN_VAULT_URL=http://localhost:12001
 OPENROUTER_API_KEY=your_api_key
 JWT_SECRET=orbit-super-secret-key-that-is-long-enough-for-hs256-algorithm
 ```
@@ -180,7 +180,7 @@ frontend/src/
 docker-compose up --build frontend
 ```
 
-Frontend will be available at `http://localhost:5173`
+Frontend will be available at `http://localhost:12000`
 
 ### Run the full stack
 
@@ -213,8 +213,8 @@ docker-compose up --build frontend
 
 ```bash
 docker ps                          # list running containers
-curl http://localhost:5173         # frontend
-curl http://localhost:8081         # auth-service
+curl http://localhost:12000         # frontend
+curl http://localhost:12001         # auth-service
 ```
 
 ---

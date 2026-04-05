@@ -3,7 +3,7 @@ import DashCard from '../../components/ui/DashCard'
 import { runCode, type CodeRunResult } from '../../api/labs'
 import { useAuthStore } from '../../store/authStore'
 
-const MINI_MAPS_URL = import.meta.env.VITE_MINI_MAPS_URL || 'http://localhost:9005'
+const MINI_MAPS_URL = import.meta.env.VITE_MINI_MAPS_URL || 'http://localhost:12007'
 
 const textInputStyle: React.CSSProperties = {
   width: '100%',

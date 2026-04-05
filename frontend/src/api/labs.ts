@@ -1,5 +1,5 @@
-const IA_URL = import.meta.env.VITE_IA_URL || 'http://localhost:5000'
-const MINI_MAPS_URL = import.meta.env.VITE_MINI_MAPS_URL || 'http://localhost:9005'
+const IA_URL = import.meta.env.VITE_IA_URL || 'http://localhost:12002'
+const MINI_MAPS_URL = import.meta.env.VITE_MINI_MAPS_URL || 'http://localhost:12007'
 
 interface AgentActionResponse<T = unknown> {
   tool: string

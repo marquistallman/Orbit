@@ -1,4 +1,4 @@
-const IA_URL = import.meta.env.VITE_IA_URL || 'http://localhost:5000'
+const IA_URL = import.meta.env.VITE_IA_URL || 'http://localhost:12002'
 
 export function formatEmailDate(isoString: string): string {
   if (!isoString) return ''

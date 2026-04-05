@@ -14,7 +14,7 @@ app = FastAPI(
 )
 
 # Comma-separated list for production domains, fallback to localhost for dev.
-raw_origins = os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173")
+raw_origins = os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:12000")
 origins = [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
 allow_credentials = os.getenv("CORS_ALLOW_CREDENTIALS", "true").lower() in ("1", "true", "yes", "on")
 

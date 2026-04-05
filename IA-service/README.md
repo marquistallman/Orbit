@@ -142,7 +142,7 @@ Resultado esperado: **14/14 tests PASSING** ✅
    docker-compose up --build
    ```
 
-2. Abre en tu navegador: **http://localhost:5000/docs**
+2. Abre en tu navegador: **http://localhost:12002/docs**
 
 3. Verás Swagger UI donde puedes probar todos los endpoints interactivamente.
 
@@ -154,7 +154,7 @@ $body = @{
     task = "write a professional email to my boss about Q1 results"
 } | ConvertTo-Json
 
-Invoke-RestMethod -Uri "http://localhost:5000/agent/run" `
+Invoke-RestMethod -Uri "http://localhost:12002/agent/run" `
   -Method Post `
   -Headers @{"Content-Type"="application/json"} `
   -Body $body
@@ -166,7 +166,7 @@ $body = @{
     task = "analyze my investment portfolio performance for tech stocks in the last quarter and give recommendations"
 } | ConvertTo-Json
 
-Invoke-RestMethod -Uri "http://localhost:5000/agent/run" `
+Invoke-RestMethod -Uri "http://localhost:12002/agent/run" `
   -Method Post `
   -Headers @{"Content-Type"="application/json"} `
   -Body $body
@@ -178,7 +178,7 @@ $body = @{
     task = "create a comprehensive python project structure for a web scraper with best practices"
 } | ConvertTo-Json
 
-Invoke-RestMethod -Uri "http://localhost:5000/agent/run" `
+Invoke-RestMethod -Uri "http://localhost:12002/agent/run" `
   -Method Post `
   -Headers @{"Content-Type"="application/json"} `
   -Body $body
@@ -201,7 +201,7 @@ Invoke-RestMethod -Uri "http://localhost:5000/agent/run" `
 #### Opción 3: Herramientas GUI
 
 Usa **Postman** o **Insomnia** (apps de desktop):
-- **URL:** `POST http://localhost:5000/agent/run`
+- **URL:** `POST http://localhost:12002/agent/run`
 - **Headers:** `Content-Type: application/json`
 - **Body (JSON):**
   ```json
@@ -226,7 +226,7 @@ El agente se adapta automáticamente según palabras clave en la tarea:
 
 ## Documentación de la API
 
-La documentación interactiva OpenAPI está disponible en: **http://localhost:5000/docs**
+La documentación interactiva OpenAPI está disponible en: **http://localhost:12002/docs**
 
 ### Endpoints principales
 
@@ -441,7 +441,7 @@ HTTP_TIMEOUT_SECONDS=20                          # Timeout HTTP (default 20s)
 JWT_SECRET=your-secret-key-change-in-production  # JWT para auth
 
 # Opcionales
-TOKEN_VAULT_URL=http://localhost:8001            # Servicio de tokens
+TOKEN_VAULT_URL=http://localhost:12001            # Servicio de tokens
 GMAIL_SERVICE_URL=http://gmail-service:8082      # URL Gmail service
 DOC_SERVICE_URL=http://doc-service:9002          # URL Doc service
 EXCEL_SERVICE_URL=http://excel-service:9004      # URL Excel service

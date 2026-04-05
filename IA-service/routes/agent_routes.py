@@ -33,7 +33,7 @@ _tg_sessions = TelegramSessionStore(os.getenv(
     os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "telegram_sessions.db")
 ))
 
-GMAIL_SERVICE_URL = os.getenv("GMAIL_SERVICE_URL", "http://localhost:8082")
+GMAIL_SERVICE_URL = os.getenv("GMAIL_SERVICE_URL", "http://localhost:12003")
 
 # Dominios de senders bancarios/pagos confiables — substring match contra el sender
 BANK_SENDER_DOMAINS = [

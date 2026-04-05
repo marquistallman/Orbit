@@ -4,7 +4,7 @@ import OrbitalNucleus from '../../components/orbit/OrbitalNucleus'
 import { getConnectedApps, App } from '../../api/apps'
 import { getMessages, formatEmailDate, getTelegramStatus, type Message } from '../../api/messages'
 
-const IA_URL = import.meta.env.VITE_IA_URL || 'http://localhost:5000'
+const IA_URL = import.meta.env.VITE_IA_URL || 'http://localhost:12002'
 
 interface AgentTask {
   task: string
