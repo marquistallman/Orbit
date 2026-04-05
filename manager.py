@@ -626,13 +626,14 @@ def start_service_in_tmux(name, command, cwd):
     if not command_exists('tmux'):
         raise RuntimeError('tmux is required to launch services in a terminal session.')
     shell_command = shlex.join(command) + ' || (echo "Service failed, keeping window open for logs"; sleep 3600)'
+    cmd = f'cd {shlex.quote(str(cwd))} && bash -c {shlex.quote(shell_command)}'
     if not tmux_has_session():
-        args = ['tmux', 'new-session', '-d', '-s', 'orbit', '-n', name, f'cd {shlex.quote(str(cwd))} && bash -c {shlex.quote(shell_command)}']
+        args = ['tmux', 'new-session', '-d', '-s', 'orbit', '-n', name, cmd]
         code, _ = run_command(args, capture_output=False)
         if code != 0:
             raise RuntimeError(f'Failed to start tmux session for {name}')
         return
-    args = ['tmux', 'new-window', '-d', '-t', 'orbit', '-n', name, f'cd {shlex.quote(str(cwd))} && bash -c {shlex.quote(shell_command)}']
+    args = ['tmux', 'new-window', '-d', '-t', 'orbit', '-n', name, cmd]
     code, _ = run_command(args, capture_output=False)
     if code != 0:
         raise RuntimeError(f'Failed to start tmux window for {name}')
