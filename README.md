@@ -29,7 +29,14 @@ Orbit is a personal AI assistant platform that centralizes your Gmail, Telegram 
 - Go 1.25+ (for gmail-service)
 - Node.js 22+ (for frontend)
 - tmux (for background services)
-- PostgreSQL and Redis (can be started via manager)
+- PostgreSQL and Redis (can be started via manager if Docker is available, otherwise install locally)
+
+**Note for servers without Docker:** If Docker is not available, install PostgreSQL and Redis locally:
+- Ubuntu/Debian: `sudo apt update && sudo apt install postgresql redis-server`
+- CentOS/RHEL: `sudo yum install postgresql-server redis`
+- macOS: `brew install postgresql redis`
+- Then start services: `sudo systemctl start postgresql redis` (Linux) or `brew services start postgresql redis` (macOS)
+- Create database: `sudo -u postgres createdb orbit` (optional, defaults to 'postgres')
 
 ### 1. Bootstrap environment
 ```bash
@@ -47,7 +54,7 @@ Interactive setup for credentials and settings (no manual editing needed).
 ```bash
 python manager.py --start
 ```
-Services start in tmux sessions. Frontend available at the assigned port (check console output).
+Services start in tmux sessions. If some fail, the rest continue; check tmux for live logs.
 
 ### 5. Access
 - Frontend: `http://localhost:<FRONTEND_PORT>` (assigned dynamically)
@@ -80,16 +87,16 @@ Services start in tmux sessions. Frontend available at the assigned port (check 
    python3 manager.py --config
    ```
 
-4. **Start infrastructure (optional, if not using external)**
+4. **Start infrastructure (optional, if using Docker and not external DB)**
    ```bash
    python3 manager.py --start-infra
    ```
+   If Docker is not available, ensure PostgreSQL and Redis are running locally (see Prerequisites).
 
 5. **Start services**
    ```bash
    python3 manager.py --start
-   ```
-
+   ```   Services start in tmux sessions. If some fail, the rest continue; check tmux for live logs.
 7. **Setup reverse proxy (nginx example)**
    ```bash
    sudo apt install nginx

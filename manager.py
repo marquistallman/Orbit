@@ -625,8 +625,7 @@ def tmux_has_session():
 def start_service_in_tmux(name, command, cwd):
     if not command_exists('tmux'):
         raise RuntimeError('tmux is required to launch services in a terminal session.')
-    log_file = cwd / f"{name.replace(' ', '_')}.log"
-    shell_command = shlex.join(command) + f' > {log_file} 2>&1'
+    shell_command = shlex.join(command)
     if not tmux_has_session():
         args = ['tmux', 'new-session', '-d', '-s', 'orbit', '-n', name, f'cd {shlex.quote(str(cwd))} && {shell_command}']
         code, _ = run_command(args, capture_output=False)
@@ -762,8 +761,11 @@ def interactive_menu():
                     raise RuntimeError(f'Busy ports detected: {conflicts}')
                 ensure_env_files()
                 for service in SERVICE_DEFINITIONS:
-                    start_service(service)
-                print('All app services have been launched.')
+                    try:
+                        start_service(service)
+                    except Exception as e:
+                        print(f"Failed to start {service['name']}: {e}")
+                print('Services startup attempted. Check tmux for status.')
             elif choice == '4':
                 stop_all_services()
             elif choice == '5':
@@ -814,7 +816,11 @@ def main():
                 raise SystemExit(f'Busy ports detected: {conflicts}')
             ensure_env_files()
             for service in SERVICE_DEFINITIONS:
-                start_service(service)
+                try:
+                    start_service(service)
+                except Exception as e:
+                    print(f"Failed to start {service['name']}: {e}")
+            print('Services startup attempted. Check tmux for status.')
             return
         if args.stop:
             stop_all_services()
