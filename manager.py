@@ -145,6 +145,18 @@ def check_or_create_env_file():
         # Fix existing .env file if it has empty OAuth credentials
         fix_empty_oauth_credentials()
 
+def check_or_create_env_local_file():
+    """Checks for a .env.local file and creates it if not found."""
+    if not os.path.exists('.env.local'):
+        print("[!] '.env.local' file not found. Creating an empty one.")
+        with open('.env.local', 'w') as f:
+            f.write("# Local overrides for environment variables\n")
+            f.write("# Add your local-specific configuration here\n")
+        print("[+] Created '.env.local' file")
+    
+    # Ensure ignored in .gitignore
+    add_to_gitignore(".env.local")
+
 def check_or_create_frontend_env():
     """Checks for frontend/.env and creates it if not found, and adds it to .gitignore."""
     frontend_dir = "frontend"
@@ -374,6 +386,7 @@ def menu_configure_secrets():
 
 def main_loop():
     check_or_create_env_file()
+    check_or_create_env_local_file()
     check_or_create_frontend_env()
     check_or_create_ia_env()
     
