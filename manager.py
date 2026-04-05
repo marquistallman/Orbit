@@ -465,40 +465,112 @@ def bootstrap_auth():
         raise RuntimeError('Failed to resolve auth-service Maven dependencies')
 
 
+def install_package_candidates(cmd, candidates, manager_cmd):
+    """Try installing a command using different package name candidates."""
+    for pkg in candidates:
+        if manager_cmd == 'apt':
+            result, _ = run_command(['sudo', 'apt-get', 'install', '-y', pkg], capture_output=True)
+        elif manager_cmd == 'yum':
+            result, _ = run_command(['sudo', 'yum', 'install', '-y', pkg], capture_output=True)
+        elif manager_cmd == 'brew':
+            result, _ = run_command(['brew', 'install', pkg], capture_output=True)
+        else:
+            return False
+        if result == 0 and command_exists(cmd):
+            return True
+    return False
+
+
 def bootstrap_system():
     """Install system dependencies if possible."""
     system = platform.system()
     if system == 'Linux':
-        try:
-            # Try apt
-            result, _ = run_command(['sudo', 'apt', 'update'], capture_output=True)
-            if result == 0:
-                deps = ['python3', 'python3-pip', 'openjdk-21-jdk', 'golang-go', 'nodejs', 'npm', 'tmux', 'postgresql', 'redis-server', 'prometheus', 'grafana']
-                result, _ = run_command(['sudo', 'apt', 'install', '-y'] + deps, capture_output=True)
-                if result != 0:
-                    raise RuntimeError('apt install failed')
-            else:
-                # Try yum
-                deps_yum = ['python3', 'python3-pip', 'java-21-openjdk', 'golang', 'nodejs', 'npm', 'tmux', 'postgresql-server', 'redis', 'prometheus', 'grafana']
-                result, _ = run_command(['sudo', 'yum', 'install', '-y'] + deps_yum, capture_output=True)
-                if result != 0:
-                    raise RuntimeError('yum install failed')
-        except (subprocess.CalledProcessError, FileNotFoundError, RuntimeError):
+        # Prefer apt-get, fallback to apt then yum.
+        pkg_manager = None
+        if command_exists('apt-get'):
+            pkg_manager = 'apt'
+        elif command_exists('apt'):
+            pkg_manager = 'apt'
+        elif command_exists('yum'):
+            pkg_manager = 'yum'
+
+        if pkg_manager == 'apt':
+            run_command(['sudo', 'apt-get', 'update'], capture_output=True)
+            commands = {
+                'python3': ['python3'],
+                'pip3': ['python3-pip'],
+                'java': ['openjdk-21-jdk', 'default-jdk'],
+                'go': ['golang-go', 'golang'],
+                'node': ['nodejs'],
+                'npm': ['npm'],
+                'tmux': ['tmux'],
+                'psql': ['postgresql'],
+                'redis-server': ['redis-server'],
+                'prometheus': ['prometheus'],
+                'grafana-server': ['grafana'],
+            }
+            for cmd, candidates in commands.items():
+                if not command_exists(cmd):
+                    installed = install_package_candidates(cmd, candidates, 'apt')
+                    if not installed and console:
+                        console.print(f'[yellow]Warning: Could not install {cmd} via apt. You may need to install it manually.[/yellow]')
+        elif pkg_manager == 'yum':
+            commands = {
+                'python3': ['python3'],
+                'pip3': ['python3-pip'],
+                'java': ['java-21-openjdk'],
+                'go': ['golang'],
+                'node': ['nodejs'],
+                'npm': ['npm'],
+                'tmux': ['tmux'],
+                'psql': ['postgresql-server'],
+                'redis-server': ['redis'],
+                'prometheus': ['prometheus'],
+                'grafana-server': ['grafana'],
+            }
+            for cmd, candidates in commands.items():
+                if not command_exists(cmd):
+                    installed = install_package_candidates(cmd, candidates, 'yum')
+                    if not installed and console:
+                        console.print(f'[yellow]Warning: Could not install {cmd} via yum. You may need to install it manually.[/yellow]')
+        else:
             if console:
-                console.print('[yellow]Warning: Could not install system dependencies automatically. Install manually: Java 21+, Go, Node.js, tmux, PostgreSQL, Redis.[/yellow]')
+                console.print('[yellow]Warning: No supported Linux package manager found (apt, apt-get, yum). Install dependencies manually.[/yellow]')
             else:
-                print('Warning: Could not install system dependencies automatically.')
+                print('Warning: No supported Linux package manager found (apt, apt-get, yum). Install dependencies manually.')
+
+        # Fallback for Go if package manager did not install it.
+        if not command_exists('go'):
+            if command_exists('curl'):
+                url = 'https://go.dev/dl/go1.25.10.linux-amd64.tar.gz'
+                archive = '/tmp/go.tar.gz'
+                run_command(['curl', '-L', '-o', archive, url], capture_output=True)
+                run_command(['sudo', 'rm', '-rf', '/usr/local/go'], capture_output=True)
+                run_command(['sudo', 'tar', '-C', '/usr/local', '-xzf', archive], capture_output=True)
+                if console:
+                    console.print('[green]Downloaded and installed Go fallback to /usr/local/go[/green]')
+            elif console:
+                console.print('[yellow]Warning: Go is still missing and curl is unavailable. Install Go manually.[/yellow]')
+            else:
+                print('Warning: Go is still missing and curl is unavailable. Install Go manually.')
+
     elif system == 'Darwin':
-        try:
-            result, _ = run_command(['brew', 'install', 'python3', 'openjdk@17', 'go', 'node', 'tmux', 'postgresql', 'redis', 'prometheus', 'grafana'], capture_output=True)
-            if result != 0:
-                raise RuntimeError('brew install failed')
-        except (subprocess.CalledProcessError, FileNotFoundError, RuntimeError):
+        if command_exists('brew'):
+            packages = ['python3', 'openjdk@21', 'go', 'node', 'tmux', 'postgresql', 'redis', 'prometheus', 'grafana']
+            for pkg in packages:
+                result, _ = run_command(['brew', 'install', pkg], capture_output=True)
+                if result != 0 and console:
+                    console.print(f'[yellow]Warning: Could not install {pkg} via brew.[/yellow]')
+        else:
             if console:
-                console.print('[yellow]Warning: Homebrew not found or failed. Install manually.[/yellow]')
+                console.print('[yellow]Warning: Homebrew not found. Install dependencies manually.[/yellow]')
+            else:
+                print('Warning: Homebrew not found. Install dependencies manually.')
     else:
         if console:
             console.print('[yellow]Warning: Unsupported OS for auto-install. Install dependencies manually.[/yellow]')
+        else:
+            print('Warning: Unsupported OS for auto-install. Install dependencies manually.')
 
 
 def bootstrap():
