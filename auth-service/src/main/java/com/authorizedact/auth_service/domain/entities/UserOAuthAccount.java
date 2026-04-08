@@ -25,13 +25,16 @@ public class UserOAuthAccount {
     private OAuthProvider provider;
 
     @Column(name = "provider_user_id")
-    private String providerUserId;
+    private String providerUserId; // El 'sub' de Auth0
 
     @Column(name = "access_token", columnDefinition = "TEXT")
     private String accessToken;
 
     @Column(name = "refresh_token", columnDefinition = "TEXT")
     private String refreshToken;
+
+    @Column(name = "expires_at")
+    private LocalDateTime expiresAt; // Añadido para control de vida del token
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

@@ -13,43 +13,46 @@ export interface AuthResponse {
   user: User
 }
 
-export const loginRequest = async (email: string, password: string): Promise<AuthResponse> => {
-  const res = await fetch(`${BASE_URL}/api/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
-  })
-  if (!res.ok) {
-    const err = await res.text()
-    throw new Error(err || 'Credenciales inválidas')
-  }
-  const data = await res.json()
-  return { token: data.token, user: data.user ?? data.userDto }
+/**
+ * Inicia el flujo de Auth0.
+ * Redirige al orquestador (Spring Boot) para que maneje el apretón de manos.
+ */
+export const loginWithAuth0 = () => {
+  window.location.href = `${BASE_URL}/oauth2/authorization/auth0`;
 }
 
-export const registerRequest = async (username: string, email: string, password: string): Promise<AuthResponse> => {
-  const res = await fetch(`${BASE_URL}/api/auth/register`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, email, password }),
-  })
-  if (!res.ok) {
-    const err = await res.text()
-    throw new Error(err || 'Error al crear cuenta')
-  }
-  const data = await res.json()
-  return { token: data.token, user: data.user ?? data.userDto }
-}
-
+/**
+ * Obtiene el perfil del usuario actual.
+ * El token enviado es el JWT de Auth0 que el backend validará contra los issuers oficiales.
+ */
 export const getMeRequest = async (): Promise<User> => {
   const token = localStorage.getItem('token')
+  if (!token) throw new Error('No token found')
+
   const res = await fetch(`${BASE_URL}/api/auth/me`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { 
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
   })
-  if (!res.ok) throw new Error('Unauthorized')
+  
+  if (!res.ok) {
+    localStorage.removeItem('token')
+    throw new Error('Unauthorized')
+  }
   return res.json()
 }
 
-export const logoutRequest = async (): Promise<void> => {
-  // Spring Boot es stateless con JWT — el logout es solo del lado del cliente
+/**
+ * Cierra la sesión localmente.
+ * TODO: Mañana evaluar si se requiere redirección al endpoint /v2/logout de Auth0
+ */
+export const logoutRequest = () => {
+  localStorage.removeItem('token')
+  // window.location.href = `${BASE_URL}/logout`; // Si el backend maneja el invalidate de Auth0
+}
+
+// Mantenemos registerRequest solo para compatibilidad de tipos si otros componentes lo usan
+export const registerRequest = async (username: string, email: string, password: string): Promise<AuthResponse> => {
+    throw new Error('Registro manual deshabilitado. Use loginWithAuth0.');
 }

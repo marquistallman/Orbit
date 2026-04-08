@@ -2,7 +2,7 @@ CREATE TABLE "users" (
   "id" uuid PRIMARY KEY,
   "email" varchar UNIQUE NOT NULL,
   "username" varchar,
-  "password_hash" varchar,
+  "password_hash" varchar, -- Ahora será NULL para usuarios de Auth0
   "is_active" boolean DEFAULT true,
   "created_at" timestamp DEFAULT (now()),
   "updated_at" timestamp
@@ -22,12 +22,15 @@ CREATE TABLE "user_oauth_accounts" (
   "id" uuid PRIMARY KEY,
   "user_id" uuid NOT NULL,
   "provider_id" uuid NOT NULL,
-  "provider_user_id" varchar,
-  "access_token" text,
-  "refresh_token" text,
+  "provider_user_id" varchar, -- Aquí guardaremos el 'sub' de Auth0
+  "access_token" text,        -- Cambiado a TEXT para JWTs largos
+  "refresh_token" text,       -- Importante para Gmail-service
+  "expires_at" timestamp,     -- Para saber cuándo refrescar sin fallar
   "created_at" timestamp DEFAULT (now())
 );
-
+INSERT INTO "oauth_providers" ("id", "name", "created_at")
+VALUES (gen_random_uuid(), 'auth0', now())
+ON CONFLICT ("name") DO NOTHING;
 CREATE TABLE "sessions" (
   "id" uuid PRIMARY KEY,
   "user_id" uuid NOT NULL,

@@ -22,8 +22,8 @@ public class User {
 
     private String username;
 
-    @Column(name = "password_hash")
-    private String password;
+    @Column(name = "password_hash") 
+    private String password; // Permite null para usuarios de Auth0
 
     @Column(name = "is_active")
     private boolean isActive = true;
@@ -36,9 +36,5 @@ public class User {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    @Column(length = 4096)
-    private String accessToken;
-
-    @Column(length = 4096)
-    private String refreshToken;
+    // --- TOKENS ELIMINADOS DE AQUÍ ---
 }

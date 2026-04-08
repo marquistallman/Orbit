@@ -11,6 +11,10 @@ import java.util.UUID;
 @Repository
 public interface UserOAuthAccountRepository extends JpaRepository<UserOAuthAccount, UUID> {
     List<UserOAuthAccount> findByUserId(UUID userId);
+    
+    // ESTA ES LA QUE NECESITAMOS PARA EL SYNCHRONIZER:
+    Optional<UserOAuthAccount> findByProviderNameAndProviderUserId(String providerName, String providerUserId);
+    
     Optional<UserOAuthAccount> findByUserIdAndProviderName(UUID userId, String providerName);
     void deleteByUserId(UUID userId);
 }
