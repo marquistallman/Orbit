@@ -86,6 +86,14 @@ func (h *Handler) SyncEmails(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) DeleteEmails(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	userID := h.extractUserID(r)
+	if userID == "" {
+		http.Error(w, "userId required (via Authorization header or ?userId param)", http.StatusBadRequest)
+		return
+	}
 
 	// Pasar el Authorization header en el contexto
 	authToken := r.Header.Get("Authorization")
@@ -94,14 +102,7 @@ func (h *Handler) DeleteEmails(w http.ResponseWriter, r *http.Request) {
 		ctx = context.WithValue(ctx, "authToken", authToken)
 	}
 
-	count, err := h.Service.DeleteEmailsByUserID(ctx
-	}
-	userID := h.extractUserID(r)
-	if userID == "" {
-		http.Error(w, "userId required (via Authorization header or ?userId param)", http.StatusBadRequest)
-		return
-	}
-	count, err := h.Service.DeleteEmailsByUserID(r.Context(), userID)
+	count, err := h.Service.DeleteEmailsByUserID(ctx, userID)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Error deleting emails: %v", err), http.StatusInternalServerError)
 		return
@@ -109,14 +110,6 @@ func (h *Handler) DeleteEmails(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(fmt.Sprintf("Eliminados %d emails", count)))
 }
 
-	// Pasar el Authorization header en el contexto
-	authToken := r.Header.Get("Authorization")
-	ctx := r.Context()
-	if authToken != "" {
-		ctx = context.WithValue(ctx, "authToken", authToken)
-	}
-
-	results, err := h.Service.SearchMessages(ctx
 func (h *Handler) DebugSearch(w http.ResponseWriter, r *http.Request) {
 	userID := h.extractUserID(r)
 	q := r.URL.Query().Get("q")
@@ -124,13 +117,6 @@ func (h *Handler) DebugSearch(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "userId and q required (userId via Authorization header or ?userId param)", http.StatusBadRequest)
 		return
 	}
-	results, err := h.Service.SearchMessages(r.Context(), userID, q)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Error: %v", err), http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(results)
 
 	// Pasar el Authorization header en el contexto
 	authToken := r.Header.Get("Authorization")
@@ -139,7 +125,14 @@ func (h *Handler) DebugSearch(w http.ResponseWriter, r *http.Request) {
 		ctx = context.WithValue(ctx, "authToken", authToken)
 	}
 
-	if err := h.Service.SendEmail(ctx
+	results, err := h.Service.SearchMessages(ctx, userID, q)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error: %v", err), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(results)
+}
 
 func (h *Handler) SendEmail(w http.ResponseWriter, r *http.Request) {
 	var req domain.EmailRequest
@@ -147,7 +140,22 @@ func (h *Handler) SendEmail(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
-	if err := h.Service.SendEmail(r.Context(), req); err != nil {
+
+	userID := h.extractUserID(r)
+	if userID == "" {
+		http.Error(w, "userId required (via Authorization header or ?userId param)", http.StatusBadRequest)
+		return
+	}
+
+	// Pasar el Authorization header en el contexto
+	authToken := r.Header.Get("Authorization")
+	ctx := r.Context()
+	if authToken != "" {
+		ctx = context.WithValue(ctx, "authToken", authToken)
+	}
+
+	req.UserID = userID
+	if err := h.Service.SendEmail(ctx, req); err != nil {
 		http.Error(w, fmt.Sprintf("Error sending: %v", err), http.StatusInternalServerError)
 		return
 	}

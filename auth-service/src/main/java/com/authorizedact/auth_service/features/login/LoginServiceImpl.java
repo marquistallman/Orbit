@@ -4,7 +4,6 @@ import com.authorizedact.auth_service.domain.entities.User;
 import com.authorizedact.auth_service.domain.repositories.UserRepository;
 import com.authorizedact.auth_service.features.shared.dtos.AuthResponse;
 import com.authorizedact.auth_service.features.shared.dtos.UserDto;
-import com.authorizedact.auth_service.infrastructure.security.JwtService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,12 +14,10 @@ public class LoginServiceImpl implements LoginService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    private final JwtService jwtService;
 
-    public LoginServiceImpl(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService) {
+    public LoginServiceImpl(UserRepository userRepository, PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
-        this.jwtService = jwtService;
     }
 
     @Override
@@ -32,8 +29,7 @@ public class LoginServiceImpl implements LoginService {
             throw new RuntimeException("Invalid password");
         }
 
-        String token = jwtService.generateToken(user);
         UserDto userDto = new UserDto(user.getId(), user.getUsername(), user.getEmail());
-        return new AuthResponse(token, userDto);
+        return new AuthResponse(null, userDto);
     }
 }

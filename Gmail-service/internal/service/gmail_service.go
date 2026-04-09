@@ -188,7 +188,7 @@ func (s *GmailService) SendEmail(ctx context.Context, req domain.EmailRequest) e
 func (s *GmailService) getGmailClient(ctx context.Context, userID string) (*gmail.Service, error) {
 	// Extraer el authToken del contexto (viene del Authorization header)
 	authToken, ok := ctx.Value("authToken").(string)
-	if !authToken || !ok {
+	if authToken == "" || !ok {
 		return nil, fmt.Errorf("no Authorization token en el contexto para user %s", userID)
 	}
 

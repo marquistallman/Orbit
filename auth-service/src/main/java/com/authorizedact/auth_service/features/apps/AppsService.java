@@ -30,12 +30,6 @@ public class AppsService {
     private final UserOAuthAccountRepository userOAuthAccountRepository;
     private final AppActivityLogRepository activityLogRepository;
 
-    @Value("${spring.security.oauth2.client.registration.google.client-id}")
-    private String googleClientId;
-
-    @Value("${spring.security.oauth2.client.registration.google.client-secret}")
-    private String googleClientSecret;
-
     private static final List<Map<String, String>> APP_CATALOG = List.of(
         Map.of("id", "google",   "name", "Google",   "description", "Gmail & Calendar",     "category", "productivity", "color", "#c47070", "icon", "✉"),
         Map.of("id", "github",   "name", "GitHub",   "description", "Code repositories",    "category", "development",  "color", "#6e7680", "icon", "⌥"),
@@ -172,8 +166,6 @@ public class AppsService {
             headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
 
             MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
-            body.add("client_id", googleClientId);
-            body.add("client_secret", googleClientSecret);
             body.add("refresh_token", account.getRefreshToken());
             body.add("grant_type", "refresh_token");
 
@@ -186,8 +178,6 @@ public class AppsService {
                 String newAccessToken = (String) response.getBody().get("access_token");
                 account.setAccessToken(newAccessToken);
                 userOAuthAccountRepository.save(account);
-                user.setAccessToken(newAccessToken);
-                userRepository.save(user);
                 logActivity(user, "Google", "Access token renewed successfully", "success");
             } else {
                 logActivity(user, "Google", "Token renewal failed", "error");

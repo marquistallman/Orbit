@@ -130,6 +130,9 @@ def check_or_create_env_file():
             f.write(f"BANK_API_URL=\n")
             f.write(f"BANK_API_KEY=\n")
             f.write(f"BANK_API_SECRET=\n")
+            f.write(f"\n# Application URLs (for OAuth2 redirects)\n")
+            f.write(f"APP_FRONTEND_URL=http://localhost:12000\n")
+            f.write(f"APP_AUTH_SERVICE_URL=http://localhost:8080\n")
             f.write(f"\n# Auth0 Configuration\n")
             f.write(f"AUTH0_DOMAIN=your_auth0_domain.auth0.com\n")
             f.write(f"AUTH0_M2M_CLIENT_ID=your_m2m_client_id\n")
@@ -352,7 +355,11 @@ def menu_configure_secrets():
     root_vars = [
         "OPENROUTER_API_KEY", "JWT_SECRET", "POSTGRES_PASSWORD",
         "GRAFANA_ADMIN_PASSWORD", "OPENROUTER_MODEL",
-        "AUTH0_DOMAIN", "AUTH0_M2M_CLIENT_ID", "AUTH0_M2M_CLIENT_SECRET"
+        "AUTH0_DOMAIN", "AUTH0_M2M_CLIENT_ID", "AUTH0_M2M_CLIENT_SECRET",
+        "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET",
+        "GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET",
+        "FACEBOOK_CLIENT_ID", "FACEBOOK_CLIENT_SECRET",
+        "LINKEDIN_CLIENT_ID", "LINKEDIN_CLIENT_SECRET"
     ]
     frontend_vars = [
         "VITE_API_URL", "VITE_IA_URL", "VITE_GMAIL_URL", "VITE_DOC_URL",

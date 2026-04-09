@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
@@ -20,13 +22,13 @@ public class Auth0ManagementClient {
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
 
-    @Value("${AUTH0_DOMAIN:dev-abc123.us.auth0.com}")
+    @Value("${auth0.domain:dev-abc123.us.auth0.com}")
     private String auth0Domain;
 
-    @Value("${AUTH0_M2M_CLIENT_ID:}")
+    @Value("${auth0.m2m.client-id:}")
     private String m2mClientId;
 
-    @Value("${AUTH0_M2M_CLIENT_SECRET:}")
+    @Value("${auth0.m2m.client-secret:}")
     private String m2mClientSecret;
 
     private String m2mAccessToken = null;
@@ -48,11 +50,13 @@ public class Auth0ManagementClient {
         String url = String.format("https://%s/api/v2/users/%s/identities", auth0Domain, userId);
 
         try {
-            Map<String, String> headers = new HashMap<>();
-            headers.put("Authorization", "Bearer " + accessToken);
-            headers.put("Content-Type", "application/json");
+            // Crear headers
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("Authorization", "Bearer " + accessToken);
+            headers.setContentType(MediaType.APPLICATION_JSON);
 
             // Hacer GET request
+            HttpEntity<String> entity = new HttpEntity<>(headers);
             String response = restTemplate.getForObject(url, String.class);
             log.debug("Auth0 Management API response: {}", response);
 
@@ -99,14 +103,20 @@ public class Auth0ManagementClient {
 
         String url = String.format("https://%s/oauth/token", auth0Domain);
 
+        // Crear body del request
         Map<String, String> body = new HashMap<>();
         body.put("client_id", m2mClientId);
         body.put("client_secret", m2mClientSecret);
         body.put("audience", String.format("https://%s/api/v2/", auth0Domain));
         body.put("grant_type", "client_credentials");
 
+        // Crear headers
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
         try {
-            String response = restTemplate.postForObject(url, body, String.class);
+            HttpEntity<Map<String, String>> entity = new HttpEntity<>(body, headers);
+            String response = restTemplate.postForObject(url, entity, String.class);
             JsonNode responseJson = objectMapper.readTree(response);
 
             m2mAccessToken = responseJson.get("access_token").asText();

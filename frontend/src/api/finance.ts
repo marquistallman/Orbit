@@ -1,4 +1,4 @@
-const IA_URL = (import.meta as any).env?.VITE_IA_SERVICE_URL || 'http://localhost:12002'
+const IA_URL = import.meta.env.VITE_IA_URL || 'http://localhost:12002'
 
 export interface FinanceSummary {
   income: number; expenses: number; savings: number; investments: number

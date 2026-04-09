@@ -6,5 +6,22 @@ export default defineConfig({
   server: {
     port: 5173,
     host: '0.0.0.0',
+    fs: {
+      allow: ['..']
+    }
   },
+  build: {
+    outDir: 'dist',
+    target: 'ES2020',
+    sourcemap: false,
+    minify: 'esbuild',
+    rollupOptions: {
+      output: {
+        manualChunks: undefined
+      }
+    }
+  },
+  define: {
+    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'production')
+  }
 })

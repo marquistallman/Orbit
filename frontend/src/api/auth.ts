@@ -22,6 +22,26 @@ export const loginWithAuth0 = () => {
 }
 
 /**
+ * Inicia sesión con email y contraseña locales.
+ */
+export const loginRequest = async (email: string, password: string): Promise<AuthResponse> => {
+  const res = await fetch(`${BASE_URL}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  })
+  
+  if (!res.ok) {
+    const error = await res.text()
+    throw new Error(error || 'Invalid credentials')
+  }
+  
+  const data = await res.json()
+  localStorage.setItem('token', data.token)
+  return data
+}
+
+/**
  * Obtiene el perfil del usuario actual.
  * El token enviado es el JWT de Auth0 que el backend validará contra los issuers oficiales.
  */
