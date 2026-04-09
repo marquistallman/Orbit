@@ -5,9 +5,11 @@ import (
 	"encoding/base64"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 	"time"
 
+	"gmail-service/internal/clients"
 	"gmail-service/internal/config"
 	"gmail-service/internal/domain"
 	"gmail-service/internal/repository"
@@ -19,12 +21,21 @@ import (
 )
 
 type GmailService struct {
-	repo   repository.EmailRepository
-	config *config.Config
+	repo              repository.EmailRepository
+	config            *config.Config
+	authServiceClient *clients.AuthServiceClient
 }
 
 func NewGmailService(repo repository.EmailRepository, cfg *config.Config) *GmailService {
-	return &GmailService{repo: repo, config: cfg}
+	authServiceURL := os.Getenv("AUTH_SERVICE_URL")
+	if authServiceURL == "" {
+		authServiceURL = "http://auth-service:8080"  // Default para Docker
+	}
+	return &GmailService{
+		repo:              repo,
+		config:            cfg,
+		authServiceClient: clients.NewAuthServiceClient(authServiceURL),
+	}
 }
 
 func (s *GmailService) GetEmails(ctx context.Context, userID string) ([]domain.Email, error) {
@@ -175,11 +186,24 @@ func (s *GmailService) SendEmail(ctx context.Context, req domain.EmailRequest) e
 
 // Helpers internos del servicio
 func (s *GmailService) getGmailClient(ctx context.Context, userID string) (*gmail.Service, error) {
-	accessToken, refreshToken, err := s.repo.GetOAuthTokens(userID)
-	if err != nil {
-		return nil, fmt.Errorf("tokens no encontrados para user %s: %w", userID, err)
+	// Extraer el authToken del contexto (viene del Authorization header)
+	authToken, ok := ctx.Value("authToken").(string)
+	if !authToken || !ok {
+		return nil, fmt.Errorf("no Authorization token en el contexto para user %s", userID)
 	}
-	if refreshToken == "" {
+
+	// Llamar a auth-service para obtener el token de Google
+	tokenResp, err := s.authServiceClient.GetTokenByUserIDAndProvider(userID, "google", authToken)
+	if err != nil {
+		log.Printf("Error obtiendo token de Google desde auth-service: %v", err)
+		return nil, fmt.Errorf("no se pudo obtener token de Google para user %s: %w", userID, err)
+	}
+
+	if tokenResp == nil || tokenResp.AccessToken == "" {
+		return nil, fmt.Errorf("token de Google vacío para user %s", userID)
+	}
+
+	if tokenResp.RefreshToken == "" {
 		return nil, fmt.Errorf("refresh_token vacío para user %s: el usuario debe reconectar su cuenta Google", userID)
 	}
 
@@ -193,8 +217,8 @@ func (s *GmailService) getGmailClient(ctx context.Context, userID string) (*gmai
 	// Sin Expiry almacenado en DB, marcamos el token como expirado para que
 	// la librería oauth2 siempre use el refresh_token y obtenga un access_token fresco.
 	token := &oauth2.Token{
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
+		AccessToken:  tokenResp.AccessToken,
+		RefreshToken: tokenResp.RefreshToken,
 		TokenType:    "Bearer",
 		Expiry:       time.Now().Add(-time.Second),
 	}

@@ -350,7 +350,8 @@ def debug_pse(request: Request):
     if not user_id:
         raise HTTPException(status_code=401, detail="user_id required")
     try:
-        resp = _requests.get(f"{GMAIL_SERVICE_URL}/emails", params={"userId": user_id}, timeout=10)
+        headers = {"Authorization": token} if token else {}
+        resp = _requests.get(f"{GMAIL_SERVICE_URL}/emails", params={"userId": user_id}, headers=headers, timeout=10)
         resp.raise_for_status()
         emails = resp.json() or []
     except Exception as e:
@@ -392,9 +393,11 @@ def get_finance_transactions(request: Request):
         raise HTTPException(status_code=401, detail="user_id required")
 
     try:
+        headers = {"Authorization": token} if token else {}
         resp = _requests.get(
             f"{GMAIL_SERVICE_URL}/emails",
             params={"userId": user_id},
+            headers=headers,
             timeout=10,
         )
         resp.raise_for_status()
@@ -421,9 +424,11 @@ def sync_finance_transactions(request: Request):
 
     def _do_sync():
         try:
+            headers = {"Authorization": token} if token else {}
             r = _requests.get(
                 f"{GMAIL_SERVICE_URL}/emails/sync",
                 params={"userId": user_id},
+                headers=headers,
                 timeout=60,
             )
             r.raise_for_status()
@@ -441,9 +446,11 @@ def sync_finance_transactions(request: Request):
 
     # 2. Leer emails actualizados de la DB
     try:
+        headers = {"Authorization": token} if token else {}
         resp = _requests.get(
             f"{GMAIL_SERVICE_URL}/emails",
             params={"userId": user_id},
+            headers=headers,
             timeout=10,
         )
         resp.raise_for_status()
@@ -746,9 +753,11 @@ async def get_messages(request: Request):
         raise HTTPException(status_code=401, detail="user_id required")
 
     try:
+        headers = {"Authorization": token} if token else {}
         resp = _requests.get(
             f"{GMAIL_SERVICE_URL}/emails",
             params={"userId": user_id},
+            headers=headers,
             timeout=10,
         )
         resp.raise_for_status()
@@ -813,10 +822,12 @@ def send_message(request: Request, payload: SendMessageRequest):
         raise HTTPException(status_code=401, detail="user_id required")
 
     try:
+        headers = {"Authorization": token} if token else {}
         resp = _requests.post(
             f"{GMAIL_SERVICE_URL}/emails/send",
             json={"userId": user_id, "to": payload.to,
                   "subject": payload.subject, "body": payload.body},
+            headers=headers,
             timeout=15,
         )
         resp.raise_for_status()

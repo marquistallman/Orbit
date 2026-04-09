@@ -130,6 +130,10 @@ def check_or_create_env_file():
             f.write(f"BANK_API_URL=\n")
             f.write(f"BANK_API_KEY=\n")
             f.write(f"BANK_API_SECRET=\n")
+            f.write(f"\n# Auth0 Configuration\n")
+            f.write(f"AUTH0_DOMAIN=your_auth0_domain.auth0.com\n")
+            f.write(f"AUTH0_M2M_CLIENT_ID=your_m2m_client_id\n")
+            f.write(f"AUTH0_M2M_CLIENT_SECRET=your_m2m_client_secret\n")
             f.write(f"\n# OAuth2 Credentials\n")
             f.write(f"GOOGLE_CLIENT_ID=placeholder\n")
             f.write(f"GOOGLE_CLIENT_SECRET=placeholder\n")
@@ -199,7 +203,7 @@ def check_or_create_ia_env():
     if not os.path.exists(env_path):
         with open(env_path, "w") as f:
             f.write("OPENROUTER_API_KEY=your_api_key_here\n")
-            f.write("TOKEN_VAULT_URL=http://localhost:12001\n")
+            f.write("TOKEN_VAULT_URL=http://auth-service:8080\n")
         print(f"Created {env_path} with default values.")
     
     # Ensure ignored in root .gitignore
@@ -347,7 +351,8 @@ def update_env_variable(file_path, key):
 def menu_configure_secrets():
     root_vars = [
         "OPENROUTER_API_KEY", "JWT_SECRET", "POSTGRES_PASSWORD",
-        "GRAFANA_ADMIN_PASSWORD", "OPENROUTER_MODEL"
+        "GRAFANA_ADMIN_PASSWORD", "OPENROUTER_MODEL",
+        "AUTH0_DOMAIN", "AUTH0_M2M_CLIENT_ID", "AUTH0_M2M_CLIENT_SECRET"
     ]
     frontend_vars = [
         "VITE_API_URL", "VITE_IA_URL", "VITE_GMAIL_URL", "VITE_DOC_URL",

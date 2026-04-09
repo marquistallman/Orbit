@@ -3,6 +3,7 @@ module gmail-service
 go 1.25.0
 
 require (
+	github.com/golang-jwt/jwt/v5 v5.2.0
 	github.com/jackc/pgx/v5 v5.9.1
 	golang.org/x/oauth2 v0.36.0
 	google.golang.org/api v0.272.0
