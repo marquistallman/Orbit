@@ -100,7 +100,7 @@ services:
 
   gmail-service:
     build:
-      context: ./gmail-service
+      context: ./Gmail-service
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
