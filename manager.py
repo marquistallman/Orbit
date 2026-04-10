@@ -135,6 +135,8 @@ def check_or_create_env_file():
             f.write(f"APP_AUTH_SERVICE_URL=http://localhost:8080\n")
             f.write(f"\n# Auth0 Configuration\n")
             f.write(f"AUTH0_DOMAIN=your_auth0_domain.auth0.com\n")
+            f.write(f"AUTH0_CLIENT_ID=your_oauth_client_id\n")
+            f.write(f"AUTH0_CLIENT_SECRET=your_oauth_client_secret\n")
             f.write(f"AUTH0_M2M_CLIENT_ID=your_m2m_client_id\n")
             f.write(f"AUTH0_M2M_CLIENT_SECRET=your_m2m_client_secret\n")
             f.write(f"\n# OAuth2 Credentials\n")
@@ -355,7 +357,8 @@ def menu_configure_secrets():
     root_vars = [
         "OPENROUTER_API_KEY", "JWT_SECRET", "POSTGRES_PASSWORD",
         "GRAFANA_ADMIN_PASSWORD", "OPENROUTER_MODEL",
-        "AUTH0_DOMAIN", "AUTH0_M2M_CLIENT_ID", "AUTH0_M2M_CLIENT_SECRET",
+        "AUTH0_DOMAIN", "AUTH0_CLIENT_ID", "AUTH0_CLIENT_SECRET",
+        "AUTH0_M2M_CLIENT_ID", "AUTH0_M2M_CLIENT_SECRET",
         "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET",
         "GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET",
         "FACEBOOK_CLIENT_ID", "FACEBOOK_CLIENT_SECRET",
