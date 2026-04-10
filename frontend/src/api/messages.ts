@@ -1,3 +1,5 @@
+import { useAuthStore } from '../store/authStore'
+
 const IA_URL = import.meta.env.VITE_IA_URL || 'http://localhost:12002'
 
 export function formatEmailDate(isoString: string): string {
@@ -31,13 +33,34 @@ export interface Message {
 }
 
 function authHeaders(): Record<string, string> {
-  const token  = localStorage.getItem('token')
-  const userId = localStorage.getItem('userId')
-  return {
-    'Content-Type': 'application/json',
-    ...(token  ? { Authorization: `Bearer ${token}` } : {}),
-    ...(userId ? { 'X-User-Id': userId }              : {}),
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  
+  // Buscar el JWT token en localStorage
+  const token = localStorage.getItem('token')
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
   }
+  
+  // Enviar userId como header adicional (fallback)
+  // Primero intentar del localStorage (más confiable), luego del store
+  let userId = localStorage.getItem('userId')
+  
+  if (!userId) {
+    try {
+      const user = useAuthStore.getState().user
+      if (user?.id) {
+        userId = user.id
+      }
+    } catch (e) {
+      // Silently ignore if useAuthStore fails
+    }
+  }
+  
+  if (userId && userId !== '0') {
+    headers['X-User-Id'] = userId
+  }
+  
+  return headers
 }
 
 export const getMessages = async (): Promise<Message[]> => {

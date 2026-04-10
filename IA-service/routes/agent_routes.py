@@ -14,6 +14,7 @@ from tools.registry import get_tools
 from tools.tool_selector import select_tool
 from tools.tool_executor import execute_tool
 from utils.logger import logger
+from utils.jwt_tools import get_auth0_user_id
 from telegram.session_store import TelegramSessionStore
 import telegram.client as _tg
 
@@ -747,22 +748,70 @@ _URGENT_KEYWORDS = ["urgent", "urgente", "asap", "critical", "crítico",
 
 @router.get("/messages")
 async def get_messages(request: Request):
-    token   = request.headers.get("Authorization")
-    user_id = request.headers.get("X-User-Id") or resolve_user_id(token)
-    if not user_id:
-        raise HTTPException(status_code=401, detail="user_id required")
+    """
+    Get messages for authenticated user.
+    
+    Tries to extract user ID from:
+    1. JWT token 'sub' or 'id' claim
+    2. X-User-Id header (fallback)
+    
+    Automatically syncs fresh data from Gmail API before returning.
+    """
+    token = request.headers.get("Authorization")
+    user_id_header = request.headers.get("X-User-Id")
+    
+    # Log received headers for debugging
+    logger.info(f"[messages] Headers - Authorization: {'present' if token else 'missing'}, X-User-Id: {user_id_header}")
+    
+    # Try to extract user ID from token claims
+    user_id = None
+    if token:
+        # Try Auth0 'sub' first, then 'id' claim
+        user_id = get_auth0_user_id(token) or resolve_user_id(token, fallback="")
+    
+    # Fallback to X-User-Id header
+    if not user_id and user_id_header:
+        user_id = user_id_header
+    
+    if not user_id or user_id == "anonymous":
+        logger.error(f"[messages] No valid user ID: token={bool(token)}, header={user_id_header}, resolved={user_id}")
+        raise HTTPException(status_code=401, detail="User ID required (via JWT token or X-User-Id header)")
+    
+    logger.info(f"[messages] User ID: {user_id}")
 
     try:
         headers = {"Authorization": token} if token else {}
+        
+        # 1. **Always** sync emails first to ensure fresh data
+        logger.info(f"[messages] Starting sync for user {user_id}...")
+        try:
+            sync_resp = _requests.post(
+                f"{GMAIL_SERVICE_URL}/emails/sync",
+                params={"auth0UserId": user_id},
+                headers=headers,
+                timeout=60,  # Sync can take up to 30s for ~180 emails
+            )
+            if sync_resp.ok:
+                logger.info(f"[messages] Sync successful")
+            else:
+                logger.warning(f"[messages] Sync returned status {sync_resp.status_code}: {sync_resp.text}")
+        except Exception as sync_err:
+            logger.warning(f"[messages] Sync error (will try to return cached emails): {sync_err}")
+        
+        # 2. Now get emails from the DB
+        logger.info(f"[messages] Fetching emails for user {user_id}...")
         resp = _requests.get(
             f"{GMAIL_SERVICE_URL}/emails",
-            params={"userId": user_id},
+            params={"auth0UserId": user_id},
             headers=headers,
             timeout=10,
         )
         resp.raise_for_status()
         emails = resp.json() or []
+        logger.info(f"[messages] Retrieved {len(emails)} emails")
+        
     except Exception as e:
+        logger.error(f"[messages] Gmail service error: {e}")
         raise HTTPException(status_code=502, detail=f"Gmail service error: {str(e)}")
 
     messages = []

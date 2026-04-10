@@ -38,6 +38,9 @@ export default function OAuthCallbackPage() {
       if (token) {
         localStorage.setItem('token', token)
         if (userId) localStorage.setItem('userId', userId)
+        if (username) localStorage.setItem('username', username)
+        if (email) localStorage.setItem('email', email)
+        
         const user = { 
           id: userId || '0', 
           username: username || 'User', 

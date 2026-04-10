@@ -91,10 +91,12 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
             activityLog.setType("success");
             activityLogRepository.save(activityLog);
 
-            // 5. Redireccionar al frontend con el Access Token de Auth0
+            // 5. Redireccionar al frontend con el Access Token de Auth0 y datos del usuario
             String targetUrl = UriComponentsBuilder.fromUriString(frontendUrl + "/oauth-callback")
                     .queryParam("token", auth0AccessToken)
                     .queryParam("email", email)
+                    .queryParam("userId", user.getId())
+                    .queryParam("username", user.getUsername())
                     .build().toUriString();
 
             getRedirectStrategy().sendRedirect(request, response, targetUrl);

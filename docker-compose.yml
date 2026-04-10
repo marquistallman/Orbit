@@ -109,6 +109,10 @@ services:
       - DB_HOST=postgres
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - AUTH_SERVICE_URL=http://auth-service:8080
+      - AUTH0_DOMAIN=${AUTH0_DOMAIN}
+      - AUTH0_M2M_CLIENT_ID=${AUTH0_M2M_CLIENT_ID}
+      - AUTH0_M2M_CLIENT_SECRET=${AUTH0_M2M_CLIENT_SECRET}
     env_file:
       - ./.env
       - ./.env.local

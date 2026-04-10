@@ -35,6 +35,7 @@ func main() {
 	// 4. Definir Rutas
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("Gmail Service OK")) })
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("Gmail Service OK")) })
 	mux.HandleFunc("/emails", h.GetEmails)
 	mux.HandleFunc("/emails/sync", h.SyncEmails)
 	mux.HandleFunc("/emails/send", h.SendEmail)

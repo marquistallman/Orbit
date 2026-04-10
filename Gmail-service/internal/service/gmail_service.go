@@ -186,26 +186,50 @@ func (s *GmailService) SendEmail(ctx context.Context, req domain.EmailRequest) e
 
 // Helpers internos del servicio
 func (s *GmailService) getGmailClient(ctx context.Context, userID string) (*gmail.Service, error) {
-	// Extraer el authToken del contexto (viene del Authorization header)
-	authToken, ok := ctx.Value("authToken").(string)
-	if authToken == "" || !ok {
-		return nil, fmt.Errorf("no Authorization token en el contexto para user %s", userID)
-	}
-
-	// Llamar a auth-service para obtener el token de Google
-	tokenResp, err := s.authServiceClient.GetTokenByUserIDAndProvider(userID, "google", authToken)
-	if err != nil {
-		log.Printf("Error obtiendo token de Google desde auth-service: %v", err)
-		return nil, fmt.Errorf("no se pudo obtener token de Google para user %s: %w", userID, err)
+	// Try two strategies to get Google tokens:
+	// 1. FIRST: Query local DB (userID assumed to be UUID)
+	// 2. FALLBACK: Query Auth0 (userID assumed to be Auth0 sub)
+	
+	var tokenResp *clients.OAuthTokenResponse
+	var err error
+	
+	log.Printf("[getGmailClient] Getting Google tokens for user: %s", userID)
+	
+	// Strategy 1: Try to get from local DB
+	log.Printf("[getGmailClient] [Strategy 1] Trying local DB for user %s...", userID)
+	accessToken, refreshToken, err := s.repo.GetOAuthTokens(userID)
+	if err == nil && accessToken != "" {
+		log.Printf("[getGmailClient] [Strategy 1] SUCCESS: Got tokens from local DB for user %s", userID)
+		tokenResp = &clients.OAuthTokenResponse{
+			AccessToken:  accessToken,
+			RefreshToken: refreshToken,
+			Provider:     "google",
+		}
+	} else {
+		log.Printf("[getGmailClient] [Strategy 1] Failed to get from local DB: %v. Trying Auth0...", err)
+		
+		// Strategy 2: Try Auth0 Management API (userID assumed to be Auth0 sub)
+		log.Printf("[getGmailClient] [Strategy 2] Trying Auth0 Management API for user %s...", userID)
+		tokenResp, err = s.authServiceClient.GetGoogleTokensFromAuth0(userID)
+		if err != nil {
+			log.Printf("[getGmailClient] [Strategy 2] ERROR: %v", err)
+			log.Printf("[getGmailClient] Could not get Google tokens from DB or Auth0 for user %s", userID)
+			return nil, fmt.Errorf("could not get Google token for user %s: %w", userID, err)
+		}
+		log.Printf("[getGmailClient] [Strategy 2] SUCCESS: Got tokens from Auth0 for user %s", userID)
 	}
 
 	if tokenResp == nil || tokenResp.AccessToken == "" {
-		return nil, fmt.Errorf("token de Google vacío para user %s", userID)
+		log.Printf("[getGmailClient] ERROR: Google access_token is empty for user %s", userID)
+		return nil, fmt.Errorf("Google access_token is empty for user %s", userID)
 	}
 
 	if tokenResp.RefreshToken == "" {
-		return nil, fmt.Errorf("refresh_token vacío para user %s: el usuario debe reconectar su cuenta Google", userID)
+		log.Printf("[getGmailClient] WARNING: refresh_token is empty for user %s", userID)
+		return nil, fmt.Errorf("refresh_token is empty for user %s: user must reconnect their Google account", userID)
 	}
+
+	log.Printf("[getGmailClient] Got Google tokens for user %s (access has expiry check)", userID)
 
 	conf := &oauth2.Config{
 		ClientID:     s.config.GoogleClientID,
@@ -214,8 +238,7 @@ func (s *GmailService) getGmailClient(ctx context.Context, userID string) (*gmai
 		Endpoint:     google.Endpoint,
 	}
 
-	// Sin Expiry almacenado en DB, marcamos el token como expirado para que
-	// la librería oauth2 siempre use el refresh_token y obtenga un access_token fresco.
+	// Mark token as expired so oauth2 lib will use refresh_token to get a fresh access_token
 	token := &oauth2.Token{
 		AccessToken:  tokenResp.AccessToken,
 		RefreshToken: tokenResp.RefreshToken,

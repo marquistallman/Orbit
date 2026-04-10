@@ -27,9 +27,36 @@ export interface AppsSummary {
   uptime: number
 }
 
+import { useAuthStore } from '../store/authStore'
+
 function authHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  
   const token = localStorage.getItem('token')
-  return token ? { Authorization: `Bearer ${token}` } : {}
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+  
+  // Enviar userId como header adicional (fallback)
+  // Primero intentar del localStorage (más confiable), luego del store
+  let userId = localStorage.getItem('userId')
+  
+  if (!userId) {
+    try {
+      const user = useAuthStore.getState().user
+      if (user?.id) {
+        userId = user.id
+      }
+    } catch (e) {
+      // Silently ignore if useAuthStore fails
+    }
+  }
+  
+  if (userId && userId !== '0') {
+    headers['X-User-Id'] = userId
+  }
+  
+  return headers
 }
 
 async function get<T>(path: string): Promise<T> {

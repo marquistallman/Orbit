@@ -78,3 +78,49 @@ func ExtractAuthorizationToken(authHeader string) string {
 	}
 	return ""
 }
+
+// ExtractAuth0UserIDFromJWT extrae el Auth0 user ID (sub claim) del JWT
+// El sub es el identificador único de Auth0 (p.e., "google-oauth2|123456789")
+func ExtractAuth0UserIDFromJWT(authHeader string) string {
+	if authHeader == "" {
+		return ""
+	}
+
+	// Remover "Bearer " si existe
+	token := strings.TrimPrefix(authHeader, "Bearer ")
+	token = strings.TrimSpace(token)
+
+	// JWT debe tener 3 partes: header.payload.signature
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		return ""
+	}
+
+	// Decodificar payload (segunda parte)
+	payloadPart := parts[1]
+	
+	// Añadir padding si es necesario
+	padding := (4 - len(payloadPart)%4) % 4
+	payloadPart += strings.Repeat("=", padding)
+
+	payload, err := base64.URLEncoding.DecodeString(payloadPart)
+	if err != nil {
+		return ""
+	}
+
+	// Parsear JSON
+	var claims map[string]interface{}
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		return ""
+	}
+
+	// Extraer el 'sub' claim (Auth0 user ID)
+	if sub, ok := claims["sub"]; ok {
+		subStr := fmt.Sprintf("%v", sub)
+		if subStr != "" {
+			return subStr
+		}
+	}
+
+	return ""
+}
